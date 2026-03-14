@@ -1,0 +1,28 @@
+{
+    "dir1": "D:/PDF",
+    "dir2": "C:/pdfs_seglat/pending",
+    "sheet_file": "C:/Users/PC/Desktop/pdfs.xlsx",
+    "time_profiles": {
+        "01500816271": {
+            "fast": 5.0,
+            "normal": 15.0,
+            "slow": 20.0,
+            "distracted": 40.0
+        },
+        "01500816272": {
+            "fast": 3.0,
+            "slow": 12.0,
+            "normal": 18.0,
+            "distracted": 27.0
+        },
+        "01500816274": {
+            "fast": 7.0,
+            "slow": 10.0,
+            "normal": 16.0,
+            "distracted": 30.0
+        }
+    },
+    "selected_profile": null,
+    "permits_dir": "D:/PDF",
+    "seglat_dir": "C:/pdfs_seglat/pending"
+}
