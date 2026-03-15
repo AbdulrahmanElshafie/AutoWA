@@ -30,8 +30,12 @@ import pandas as pd
 import time
 import random
 from gui.layout import config
-from app.WAController import WAController
 import os
+try:
+    from core.runner import execute_jobs
+except ImportError:
+    def execute_jobs(csv_path):
+        return {"total": 0, "success": 0, "failed": 0}
 import math
 from logger import log_function
 import gui.events as events
@@ -98,221 +102,72 @@ def validate_inputs(values):
     return True
 
 @log_function
-def save_excel(df):
-    """
-    Save the given DataFrame to an Excel file on the desktop.
-
-    Parameters:
-    - df (pd.DataFrame): The DataFrame containing execution results.
-
-    Logic:
-    - Attempts to save to a primary filename.
-    - If it fails (e.g., file in use), saves to a secondary filename.
-    - Columns are renamed for Arabic headers. 
-    - Use openpyxl engine to handle Arabic text in the excel file
-    """ 
-    try:
-        df.to_excel('C:\\Users\\PC\\Desktop\\pdfs.xlsx', index=False, engine="openpyxl", 
-                header=['رقم الهاتف', 'اسم الضابط', 'الرقم القومي للضابط / الرسالة', 'الحالة'])
-    except Exception as e:
-        df.to_excel('C:\\Users\\PC\\Desktop\\pdfs res.xlsx', index=False, engine="openpyxl", 
-                header=['رقم الهاتف', 'اسم الضابط', 'الرقم القومي للضابط / الرسالة', 'الحالة'])
-
-def calculate_stats(df):
-    successfully_sent = len(df[df['الحالة'] == "تم إرسال المحتوى بنجاح"])
-    pending_sent = len(df[df['الحالة'].isna()])
-    failed_sent = len(df[(df['الحالة'] != "تم إرسال المحتوى بنجاح") & (~df['الحالة'].isna())])
-
-    return successfully_sent, pending_sent, failed_sent
-
-@log_function
-def run_execution(values, window):  
-    """
-    Main execution function to process a list of officers/messages from Excel,
-    interact with WAController, and update the GUI progress.
-
-    Parameters:
-    - values (dict): GUI input values.
-    - window (sg.Window): The active GUI window to update progress.
-
-    Returns:
-    - None: Updates the GUI and writes results to Excel directly.
-
-    Logic:
-    1. Validates and loads the Excel input file.
-    2. Determines the document type to send based on GUI selections.
-    3. Initializes WAController and sets batch and round parameters.
-    4. Iterates through the DataFrame:
-       - Skips rows that have already been processed.
-       - Opens WA accounts as needed.
-       - Sends messages or documents.
-       - Updates the "الحالة" column with results.
-       - Updates progress bar, estimated remaining time, and rounds left.
-       - Pauses or waits based on message and batch timing parameters.
-       - Handles exceptions and ensures the WAController is reset.
-    5. Saves final results to Excel and updates GUI buttons and events.
-
-    Notes:
-    - Uses randomization in batch size and wait times to mimic human behavior.
-    - Supports pausing/stopping through the global `events.running` flag.
-    - Handles GUI closure events safely.
-    """  
-    # Check the existence of the input files
+def run_execution(values, window):
     excel_file_path = config.get("sheet_file")
     if not excel_file_path or not os.path.exists(excel_file_path):
         sg.popup("ملف الإدخال غير موجود")
         events.running = False
-        window.write_event_value("-THREAD DONE-", ("ERROR", None, None, None, None))
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
         return
-    
-    # Read the input file
-    df = pd.read_excel(excel_file_path, engine="openpyxl")
-    
-    # Read the kind of content to be sent (permit, seglat, msg)
-    if values["-TYPE_PERMIT-"]:
-        doc_type = "permit"
-    elif values["-TYPE_SEGLAT-"]:
-        doc_type = "seglat"
-    elif values["-TYPE_MSG-"]:
-        doc_type = "msg"
-    else:
-        doc_type = None
 
-    # Read the typing, waiting profile
-    profile_name = values["-PROFILE-"] 
-    # Read the account batch size (number of msgs sent per account)
-    batch_avg_size = int(values["-BATCH_SIZE-"]) 
-    total_rows = len(df) # total number of rows in the input sheet
-    current_count = 0 # current progress
-    round_size = int(batch_avg_size) * 2 # round size for the two accounts
-    rounds_left = math.ceil(total_rows / round_size) # the rounds left to send all msgs
+    result = {}
+    import threading
+    def target():
+        try:
+            result['stats'] = execute_jobs(excel_file_path)
+        except Exception as e:
+            result['error'] = str(e)
 
-    # Initialize GUI progress indicators
+    try:
+        df = pd.read_csv(excel_file_path)
+        total_rows = len(df)
+    except:
+        total_rows = 1
+
     window["-PROGRESS-"].update(current_count=0, max=total_rows)
-    window["-PROGRESS_TEXT-"].update(f"0 / {total_rows}")
-    window["-ROUNDS_LEFT-"].update(str(rounds_left))
-
-    # randomize the number of msgs sent
-    e = random.randint(max(1, batch_avg_size // 2), batch_avg_size + 2)
-    i = 0 # track the batch progress
-    wa_account = 1 # wa account/browser to use initially
-    controller = WAController(profile_name) # WA controller 
 
     start_time = time.time()
+    t = threading.Thread(target=target, daemon=True)
+    t.start()
 
-    controller.controller.ensure_device_lang_is_en()
-    for idx, row in df.iterrows():
-        msg = None
-        res = None
+    while t.is_alive():
+        if not events.running:
+            break
+            
+        time.sleep(1)
         try:
-            if not events.running:  # Stop if global flag is False (Pause is clicked)
-                save_excel(df)
-                break
-
-             # Skip rows already attempted to send 
-            if not pd.isna(row['الحالة']):
-                current_count += 1
-                continue
-
-            # Extract data from row
-            phone_number = str(int(row.iloc[0])).removeprefix("20")
-            name = str(row.iloc[1]) or " "
-            officer_id_msg = str(int(row.iloc[2])) if not isinstance(row.iloc[2], str) else row.iloc[2]
-            
-            # Open WA account for batch
-            if (not i) or (i % (batch_avg_size + e) == 0):
-                controller.open_wa(wa_account)
-            
-            # Send content via WAController
-            contact_added = False
-            is_egyptian = phone_number.startswith(("10", "11", "12", "15"))
-            try:
-                # Add the officer contact or find it on WA
-                res, msg = controller.add_contact(phone_number, officer_id_msg)
-                # If the contact was found on WA proceed
-                if res:
-                    contact_added = True
-                    # Send the msg to the officer
-                    res, msg = controller.send_content(officer_id_msg, name, doc_type)
-                    # If the numebr is not a foriegn number then it's added in the contacts
-            finally:
-                # then delete it after sending the msg 
-                if contact_added and is_egyptian:
-                    controller.delete_contact()
-
-            # Reset the WA UI by clicking on the msgs icon
-            # And close the currently opened chat
-            controller.reset_wa()
-            controller.close_chat()
-            # Update the status of the current row to be saved later 
-            # df.loc[idx, "الحالة"] = msg
-            if msg is not None:
-                df.loc[idx, "الحالة"] = msg
+            df = pd.read_csv(excel_file_path)
+            if 'status' in df.columns:
+                processed = len(df[df['status'] != 'pending'])
+                # avoid taking NaN as processed if not correctly stored. We consider success or fail as processed
             else:
-                df.loc[idx, "الحالة"] = "لم يتم التنفيذ"
-
-            # --- Update GUI progress ---
-            current_count = idx + 1
-            elapsed = time.time() - start_time
-            avg_per_msg = elapsed / current_count
-            remaining_time_sec = avg_per_msg * (total_rows - current_count)
-            rounds_left = math.ceil((total_rows - current_count) / round_size)
-            est_text = f"{remaining_time_sec/60:.1f} دقيقة"
+                processed = 0
             
-            window["-PROGRESS-"].update(current_count=current_count)
-            window["-PROGRESS_TEXT-"].update(f"{current_count} / {total_rows}")
-            window["-EST_TIME-"].update(est_text)
-            window["-ROUNDS_LEFT-"].update(str(rounds_left))
+            window["-PROGRESS-"].update(current_count=processed)
+            window["-PROGRESS_TEXT-"].update(f"{processed} / {total_rows}")
+        except:
+            pass
 
-            # Handle batch completion and wait
-            i += 1
-            if i >= (batch_avg_size + e):
-                if wa_account == len(controller.accounts):
-                    batch_wait = random.uniform(
-                        float(values["-BATCH_WAIT_MIN-"]) * 60,
-                        float(values["-BATCH_WAIT_MAX-"]) * 60
-                    )
-                    save_excel(df)
-                    successfully_sent, pending_sent, failed_sent = calculate_stats(df)
-                    window.write_event_value("-BATCH BREAK-", (successfully_sent, pending_sent, failed_sent, batch_wait))
-                    time.sleep(batch_wait)
-
-                i = 0
-                e = random.randint(max(1, batch_avg_size // 2), batch_avg_size + 2)
-                wa_account = wa_account % len(controller.accounts) + 1
-            else:
-                # Random wait between messages
-                msg_wait = random.uniform(
-                    float(values["-MSG_WAIT_MIN-"]),
-                    float(values["-MSG_WAIT_MAX-"])
-                )
-                time.sleep(msg_wait)
-
-             # Allow GUI to refresh and check for closure
-            event, _ = window.read(timeout=0)
-            if event == sg.WIN_CLOSED or event == "-CANCEL-":
-                save_excel(df)
-                break
-                
+    t.join(timeout=1.0)
     
-        except Exception as exception:
-            # Handle unexpected failures
-            df.loc[idx, "الحالة"] = f"فشل غير متوقع - {str(exception)}"
-            save_excel(df)
-            # controller.close_wa()
-            # controller.open_wa(wa_account)
+    if 'stats' in result:
+        stats = result['stats']
+        successfully_sent = stats.get("success", 0)
+        failed_sent = stats.get("failed", 0)
+        pending_sent = stats.get("total", total_rows) - successfully_sent - failed_sent
+        if not events.running and pending_sent > 0:
+            status = "PAUSED"
+        else:
+            status = "DONE"
+    else:
+        successfully_sent = failed_sent = pending_sent = 0
+        status = "ERROR"
 
-
-    # Finalize execution
     events.running = False
     window["-PAUSE-"].update(disabled=True)
     window["-EXECUTE-"].update(disabled=False)
-    save_excel(df)
-    successfully_sent, pending_sent, failed_sent = calculate_stats(df)
-    if current_count == total_rows:
-        window.write_event_value("-THREAD DONE-", ("DONE", successfully_sent, pending_sent, failed_sent, None))
-    else:
-        window.write_event_value("-THREAD DONE-", ("PAUSED", successfully_sent, pending_sent, failed_sent, None))
+    
+    window.write_event_value("-THREAD DONE-", (status, successfully_sent, pending_sent, failed_sent, None))
 
 
 @log_function

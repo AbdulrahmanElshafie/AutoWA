@@ -1,0 +1,4 @@
+number,contact_name,message_mode,message_text,message_key,doc_mode,doc_path,status,status_message
+201234567890,Ahmed,fixed,Hello officer,,none,,pending,
+201234567891,Mohamed,template,,permit_msg,fixed,,pending,
+201234567892,Ali,doc_only,,,variable,docs/permit_1.pdf,pending,

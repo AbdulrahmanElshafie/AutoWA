@@ -1,0 +1,10 @@
+{
+    "permit_msg": {
+        "title": "تصريح سير",
+        "enabled": true,
+        "variants": [
+            "message 1",
+            "message 2"
+        ]
+    }
+}

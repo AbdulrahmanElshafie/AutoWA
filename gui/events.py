@@ -78,7 +78,7 @@ def handle_events(event, values, window):
     elif event in ("-MSG_WAIT_MIN-", "-MSG_WAIT_MAX-", "-BATCH_WAIT_MIN-", "-BATCH_WAIT_MAX-", "-BATCH_SIZE-", "-UPDATE_SHEET-"):
         sheet = config.get("sheet_file")
         if sheet and os.path.exists(sheet):
-            df_full = pd.read_excel(sheet)
+            df_full = pd.read_csv(sheet)
             refresh_total_count(window, df_full) # Update total record count
         else:
             sg.popup("ملف الإدخال غير موجود")
@@ -171,6 +171,90 @@ def handle_events(event, values, window):
                 window["-PROFILE-"].update(values=list(config["time_profiles"].keys()), value="")
                 window["-PROFILE_PREVIEW-"].update("")
 
+    # --- Template Manager Events ---
+    elif event == "-TEMPLATE_SELECT-":
+        selected = values["-TEMPLATE_SELECT-"]
+        messages = load_messages()
+        if selected and selected in messages:
+            variants = messages[selected].get("variants", [])
+            window["-VARIANTS_LIST-"].update(values=variants)
+        else:
+            window["-VARIANTS_LIST-"].update(values=[])
+            
+    elif event == "إضافة قالب":
+        messages = load_messages()
+        t_name = sg.popup_get_text("اسم القالب الجديد (مثال: permit_msg):")
+        if t_name:
+            t_title = sg.popup_get_text("عنوان القالب:")
+            if t_title:
+                messages[t_name] = {"title": t_title, "enabled": True, "variants": []}
+                save_messages(messages)
+                window["-TEMPLATE_SELECT-"].update(values=list(messages.keys()), value=t_name)
+                window["-VARIANTS_LIST-"].update(values=[])
+
+    elif event == "تعديل قالب":
+        messages = load_messages()
+        selected = values["-TEMPLATE_SELECT-"]
+        if selected and selected in messages:
+            t_title = sg.popup_get_text("عنوان القالب الجديد:", default_text=messages[selected].get("title", ""))
+            if t_title:
+                messages[selected]["title"] = t_title
+                save_messages(messages)
+        else:
+            sg.popup("الرجاء اختيار قالب لتعديله")
+
+    elif event == "حذف قالب":
+        messages = load_messages()
+        selected = values["-TEMPLATE_SELECT-"]
+        if selected and selected in messages:
+            if sg.popup_yes_no(f"هل أنت متأكد من حذف القالب {selected}؟") == "Yes":
+                messages.pop(selected)
+                save_messages(messages)
+                window["-TEMPLATE_SELECT-"].update(values=list(messages.keys()), value="")
+                window["-VARIANTS_LIST-"].update(values=[])
+        else:
+            sg.popup("الرجاء اختيار قالب لحذفه")
+
+    elif event == "إضافة متغير":
+        messages = load_messages()
+        selected = values["-TEMPLATE_SELECT-"]
+        if selected and selected in messages:
+            variant = sg.popup_get_text("النص المتغير:")
+            if variant:
+                messages[selected].setdefault("variants", []).append(variant)
+                save_messages(messages)
+                window["-VARIANTS_LIST-"].update(values=messages[selected]["variants"])
+        else:
+            sg.popup("الرجاء اختيار قالب أولاً")
+
+    elif event == "تعديل متغير":
+        messages = load_messages()
+        selected_temp = values["-TEMPLATE_SELECT-"]
+        selected_vars = values["-VARIANTS_LIST-"]
+        if selected_temp and selected_temp in messages and selected_vars:
+            old_variant = selected_vars[0]
+            new_variant = sg.popup_get_text("النص المتغير الجديد:", default_text=old_variant)
+            if new_variant:
+                idx = messages[selected_temp]["variants"].index(old_variant)
+                messages[selected_temp]["variants"][idx] = new_variant
+                save_messages(messages)
+                window["-VARIANTS_LIST-"].update(values=messages[selected_temp]["variants"])
+        else:
+            sg.popup("الرجاء اختيار قالب ومتغير لتعديله")
+
+    elif event == "حذف متغير":
+        messages = load_messages()
+        selected_temp = values["-TEMPLATE_SELECT-"]
+        selected_vars = values["-VARIANTS_LIST-"]
+        if selected_temp and selected_temp in messages and selected_vars:
+            old_variant = selected_vars[0]
+            if sg.popup_yes_no("هل أنت متأكد من حذف هذا المتغير؟") == "Yes":
+                messages[selected_temp]["variants"].remove(old_variant)
+                save_messages(messages)
+                window["-VARIANTS_LIST-"].update(values=messages[selected_temp]["variants"])
+        else:
+            sg.popup("الرجاء اختيار قالب ومتغير لحذفه")
+
     # --- Execute sending msgs and its controls ---
     elif event == "-EXECUTE-":
         # # Turn on the pause option
@@ -201,10 +285,13 @@ def handle_events(event, values, window):
             # Get the current progress from the input file
             excel_file_path = config.get("sheet_file")
             if excel_file_path and os.path.exists(excel_file_path):
-                df = pd.read_excel(excel_file_path, engine="openpyxl")
+                df = pd.read_csv(excel_file_path)
                 # Delete the progress and save the file
-                df.iloc[:, 3] = ""
-                df.to_excel(excel_file_path, index=False, engine="openpyxl")
+                if 'status' in df.columns:
+                    df['status'] = 'pending'
+                if 'status_message' in df.columns:
+                    df['status_message'] = ''
+                df.to_csv(excel_file_path, index=False)
                 # Notify the user that the restart is ready
                 sg.popup("تم تهيئة السجلات للبداية من جديد")
                 # Turn on the pause option
