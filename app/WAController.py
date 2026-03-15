@@ -436,3 +436,48 @@ class WAController:
         """
         # Find and click the chats icon
         self.controller.find_click(self.base_path + "WA Chats", 0.7, False)
+
+    @log_function
+    def send(self, number: str, message: str, document: str) -> tuple[bool, str]:
+        """
+        Send a resolved message and document to a given number.
+        This provides a unified interface for the Core Engine, 
+        independent of internal resolution logics.
+        """
+        try:
+            # Attempt to add/search for contact
+            # We pass an empty name as contact naming may not be needed for direct send from core
+            success, _ = self.add_contact(number, "")
+            if not success:
+                return False, "whatsapp_not_detected"
+
+            # Find the msg box in the chat
+            if not self.controller.wait(self.base_path + "Msg Bar", 3):
+                return False, "whatsapp_not_detected"
+            
+            self.controller.find_click(self.base_path + "Msg Bar", 0.7)
+
+            # Type out the text message if any
+            if message:
+                self.controller.copy_paste(message)
+
+            # Attach a document if requested
+            if document:
+                self.controller.find_click(self.base_path + "Add Doc", 0.9)
+                self.controller.find_click(self.base_path + "Doc")
+                self.controller.type(document)
+                
+                # Send the document
+                self.controller.click_enter()
+                
+                # Wait till the msg is successfully sent
+                if not self.controller.wait(self.base_path + "File Sent", 15):
+                    return False, "send_failure"
+            else:
+                if message:
+                    # Send just the text
+                    self.controller.click_enter()
+
+            return True, ""
+        except Exception as e:
+            return False, "send_failure"
