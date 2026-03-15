@@ -1,0 +1,28 @@
+{
+    "type": "object",
+    "description": "Message template storage",
+    "patternProperties": {
+        "^[a-zA-Z0-9_]+$": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "variants": {
+                    "type": "array",
+                    "description": "List of message variants used for random selection",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
+                }
+            },
+            "required": [
+                "variants"
+            ]
+        }
+    }
+}

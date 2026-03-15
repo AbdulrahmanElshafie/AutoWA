@@ -1,0 +1,45 @@
+{
+    "type": "object",
+    "properties": {
+        "fixed_doc_path": {
+            "type": "string"
+        },
+        "timing_profiles": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "object",
+                "properties": {
+                    "typing_speed": {
+                        "type": "number"
+                    },
+                    "move_speed": {
+                        "type": "number"
+                    },
+                    "wait_variance": {
+                        "type": "number"
+                    }
+                }
+            }
+        },
+        "execution": {
+            "type": "object",
+            "properties": {
+                "batch_size": {
+                    "type": "integer"
+                },
+                "msg_wait_min": {
+                    "type": "number"
+                },
+                "msg_wait_max": {
+                    "type": "number"
+                },
+                "batch_wait_min": {
+                    "type": "number"
+                },
+                "batch_wait_max": {
+                    "type": "number"
+                }
+            }
+        }
+    }
+}
