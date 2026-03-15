@@ -19,7 +19,8 @@ import os
 import math
 from logger import log_function
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "config/config.json"
+MESSAGES_FILE = "config/messages.json"
 
 # Default configuration structure to use if config.json is missing or empty
 default_config = {
@@ -63,6 +64,26 @@ def save_config(cfg):
     """
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=4, ensure_ascii=False)
+
+@log_function
+def load_messages():
+    """
+    Load the message templates from MESSAGES_FILE.
+    """
+    if os.path.exists(MESSAGES_FILE):
+        with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+@log_function
+def save_messages(msgs):
+    """
+    Save the given messages dictionary to MESSAGES_FILE.
+    """
+    if not os.path.exists(os.path.dirname(MESSAGES_FILE)):
+        os.makedirs(os.path.dirname(MESSAGES_FILE))
+    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
+        json.dump(msgs, f, indent=4, ensure_ascii=False)
 
 @log_function
 def to_seconds(val, unit):

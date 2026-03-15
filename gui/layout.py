@@ -22,11 +22,13 @@ It only defines *what* the GUI looks like.
 
 
 import FreeSimpleGUI as sg
-from .helpers import load_config
+from .helpers import load_config, load_messages
 
 # Load persisted configuration (paths, profiles, etc.)
 # This allows the GUI to preload previously saved values
 config = load_config()
+messages = load_messages()
+template_keys = list(messages.keys())
 
 
 # -------------------------------------------------------------------
@@ -42,8 +44,8 @@ paths_layout = [
     [sg.Text("مجلد التصاريح:"), sg.Input(config.get("permits_dir") or "", key="-DIR1-"), sg.FolderBrowse()],
     # Seglat directory selection
     [sg.Text("مجلد السجلات:"), sg.Input(config.get("seglat_dir") or "", key="-DIR2-"), sg.FolderBrowse()],
-    # Excel sheet selection
-    [sg.Text("ملف البيانات:"), sg.Input(config.get("sheet_file") or "", key="-SHEET-"), sg.FileBrowse(file_types=(("Excel", "*.xlsx;*.xls"),))],
+    # CSV file selection
+    [sg.Text("ملف البيانات:"), sg.Input(config.get("sheet_file") or "", key="-SHEET-"), sg.FileBrowse(file_types=(("CSV Files", "*.csv"),))],
     # Confirm and persist selected paths
     [sg.Button("تأكيد المسارات", key="-CONFIRM_PATHS-")]
 ]
@@ -65,6 +67,20 @@ profiles_layout = [
     [sg.Multiline("", size=(40,4), key="-PROFILE_PREVIEW-", disabled=True)],
     # Profile management actions
     [sg.Button("إضافة ملف سرعة الكتابة"), sg.Button("تعديل ملف سرعة الكتابة"), sg.Button("حذف ملف سرعة الكتابة")]
+]
+
+# -------------------------------------------------------------------
+# Template Manager Layout
+# -------------------------------------------------------------------
+# Allows the user to:
+# - Add, edit, delete message templates
+# - View and modify variants for a selected template
+templates_layout = [
+    [sg.Text("القوالب (Templates):"), sg.Combo(template_keys, key="-TEMPLATE_SELECT-", enable_events=True, size=(30, 1))],
+    [sg.Button("إضافة قالب"), sg.Button("تعديل قالب"), sg.Button("حذف قالب")],
+    [sg.Text("متغيرات الرسائل (Variants):")],
+    [sg.Listbox(values=[], key="-VARIANTS_LIST-", size=(50, 5), enable_events=True)],
+    [sg.Button("إضافة متغير"), sg.Button("تعديل متغير"), sg.Button("حذف متغير")]
 ]
 
 # -------------------------------------------------------------------
@@ -146,6 +162,7 @@ important_notes_layout = [
 layout = [
     [sg.Frame("المسارات", paths_layout)],
     [sg.Frame("سرعات الكتابة", profiles_layout)],
+    [sg.Frame("إدارة القوالب", templates_layout)],
     [sg.Frame("ملاحظات هامة", important_notes_layout, title_color="darkred")],
     [sg.Frame("العمليات", ops_layout)]
 ]
