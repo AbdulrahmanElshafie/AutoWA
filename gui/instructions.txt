@@ -1,27 +1,26 @@
-تعليمات استخدام منظمة التواصل:
+Communication System Usage Instructions:
 
-مفاهيم:
-- ايقاف مؤقت => في حالة الطوارئ فقط يتم ايقاف البرنامج مؤقتا، عند الضغط عليه يقوم البرنامج بإرسال التصريح الحالي ثم حفظ التقدم و التوقف
-- تنفيذ => يقوم بتنفيذ البرنامج و إرسال التصاريح
-- إعادة التنفيذ => يقوم ببدء إرسال التصاريح من البداية
-- إالغاء => يقوم بإغلاق البرنامج
-- تحديث الملف => يقوم بقراءة ملف الإدخال و تحديث البيانات المطلوب إرسالها
-- الدفعة => عدد التصاريح علي حساب الواتساب الواحد
-- الجولة => عدد التصاريح المرسلة علي الحسابين = 2 * الدفعة
-- ملف التوقيت => هو ملف به الوقت الذي يتم اخذه اثناء الكتابة بين الكلمات لمحاكاة كتابة الشخص العادي
+Concepts:
+- Pause => For emergency use only to pause the program. When pressed, the program sends the current permit then saves progress and stops.
+- Execute => Executes the program and sends the permits.
+- Restart => Starts sending permits from the beginning.
+- Cancel => Closes the program.
+- Update Sheet => Reads the input file and updates the data to be sent.
+- Batch => Number of permits per single WhatsApp account.
+- Round => Total permits sent across all accounts = accounts_count * batch_size.
+- Timing Profile => A profile containing the time taken while typing between words to simulate a normal person's typing.
 ==========================================================
-بعد تنفيذ و تحضير ما تود ارساله (تصاريح سفر، 53 تعبئة، رسائل تواصل) يتم نقل البيانات الي ملف pdfs.xlsx و وضع البيانات في الأعمدة المخصصة
-= في التصاريح:
-يتم وضع رفم الهاتف و اسم الضابط و رقمه القومي
-= في 53 تعبئة:
-يتم وضع رفم الهاتف و رقمه القومي
-= في رسائل التواصل:
-يتم وضع رفم الهاتف اسم الضابط و الرسالة المرسلة
+After preparing what you want to send (travel permits, 53 filling, communication messages), move the data to the Jobs Data File (CSV) and place the data in the designated columns.
+= In Permits:
+Place the phone number, officer name, and national ID.
+= In 53 Filling:
+Place the phone number and national ID.
+= In Communication Messages:
+Place the phone number, officer name, and the message text.
 ==========================================================
-خطوات الإرسال:
-1- اختر جميع المسارات المطلوبة و قم بتأكيد المسارات (مجلد التصاريح، مجلد 53 تعبئة، ملف الإددخال)
-2- اختر ملف التوقيت المرغوب - هي اوقات الانتظار بين الكلمات اثناء الكتابة
-3- اختر نوع العملية و الحد الأدني و الأقصي للانتظار بين الرسائل و الدفعات و عدد التصاريح للمجموعة
-4- قم بتحديث الملف ثم اضغط تنفيذ
-5- من المهم جدا عدم تحريك الماوس اثناء عمل البرنامج لتجنب المشاكل
-
+Sending Steps:
+1- Select all required paths and confirm them (Permits folder, input CSV file).
+2- Select the desired Timing Profile - these are the wait times between words during typing.
+3- Choose the operation mode, set minimum and maximum wait between messages and batches, and set the batch size.
+4- Update the data then press Execute.
+5- It is very important not to move the mouse while the program is running to avoid problems.

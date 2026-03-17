@@ -41,13 +41,12 @@ template_keys = list(messages.keys())
 # These values are later validated and saved by GUI helpers.
 paths_layout = [
     # Permits directory selection
-    [sg.Text("مجلد التصاريح:"), sg.Input(config.get("permits_dir") or "", key="-DIR1-"), sg.FolderBrowse()],
-    # Seglat directory selection
-    [sg.Text("مجلد السجلات:"), sg.Input(config.get("seglat_dir") or "", key="-DIR2-"), sg.FolderBrowse()],
-    # CSV file selection
-    [sg.Text("ملف البيانات:"), sg.Input(config.get("sheet_file") or "", key="-SHEET-"), sg.FileBrowse(file_types=(("CSV Files", "*.csv"),))],
+    [sg.Text("Document Folder (if variant):"), sg.Input(config.get("doc_dir") or "", key="-DOC_DIR-"), sg.FolderBrowse("Browse...")],
+    [sg.Text("Data File (CSV):"), sg.Input(config.get("sheet_file") or "", key="-SHEET-"), sg.FileBrowse("Browse...", file_types=(("CSV Files", "*.csv"),))],
+    # Browsers Selection
+    [sg.Text("Browsers:"), sg.Listbox(["Default Browser", "Chrome", "Edge"], default_values=config.get("browsers", ["Default Browser"]), select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE, size=(20, 3), key="-BROWSERS-", enable_events=True)],
     # Confirm and persist selected paths
-    [sg.Button("تأكيد المسارات", key="-CONFIRM_PATHS-")]
+    [sg.Button("Confirm Paths", key="-CONFIRM_PATHS-")]
 ]
 
 # -------------------------------------------------------------------
@@ -62,11 +61,11 @@ paths_layout = [
 # used by the WhatsApp automation engine.
 profiles_layout = [
     # Dropdown to select an existing timing profile
-    [sg.Text("ملف سرعة الكتابة:"), sg.Combo(list(config["time_profiles"].keys()), key="-PROFILE-", enable_events=True)],
+    [sg.Text("Typing Speed Profile:"), sg.Combo(list(config["time_profiles"].keys()), key="-PROFILE-", enable_events=True)],
     # Read-only preview of the selected profile values
     [sg.Multiline("", size=(40,4), key="-PROFILE_PREVIEW-", disabled=True)],
     # Profile management actions
-    [sg.Button("إضافة ملف سرعة الكتابة"), sg.Button("تعديل ملف سرعة الكتابة"), sg.Button("حذف ملف سرعة الكتابة")]
+    [sg.Button("Add Profile"), sg.Button("Edit Profile"), sg.Button("Delete Profile")]
 ]
 
 # -------------------------------------------------------------------
@@ -76,11 +75,11 @@ profiles_layout = [
 # - Add, edit, delete message templates
 # - View and modify variants for a selected template
 templates_layout = [
-    [sg.Text("القوالب (Templates):"), sg.Combo(template_keys, key="-TEMPLATE_SELECT-", enable_events=True, size=(30, 1))],
-    [sg.Button("إضافة قالب"), sg.Button("تعديل قالب"), sg.Button("حذف قالب")],
-    [sg.Text("متغيرات الرسائل (Variants):")],
+    [sg.Text("Templates:"), sg.Combo(template_keys, key="-TEMPLATE_SELECT-", enable_events=True, size=(30, 1))],
+    [sg.Button("Add Template"), sg.Button("Edit Template"), sg.Button("Delete Template")],
+    [sg.Text("Message Variants:")],
     [sg.Listbox(values=[], key="-VARIANTS_LIST-", size=(50, 5), enable_events=True)],
-    [sg.Button("إضافة متغير"), sg.Button("تعديل متغير"), sg.Button("حذف متغير")]
+    [sg.Button("Add Variant"), sg.Button("Edit Variant"), sg.Button("Delete Variant")]
 ]
 
 # -------------------------------------------------------------------
@@ -94,58 +93,77 @@ templates_layout = [
 # - Monitor progress and estimated time
 ops_layout = [
     # Instructions popup
-    [sg.Button("التعليمات", key="-INSTRUCTIONS-")],
+    [sg.Button("Instructions", key="-INSTRUCTIONS-")],
     # Total messages counter (calculated elsewhere)
-    [sg.Text("عدد الرسائل: 0", key="-TOTAL_COUNT-")],
-    # Message type selection (mutually exclusive)
-    [sg.Radio("تلقائي", "TYPE", key="-AUTO-", default=True),
-    sg.Radio("تصاريح", "TYPE", key="-TYPE_PERMIT-"),
-    sg.Radio("نماذج 53 تعبئة", "TYPE", key="-TYPE_SEGLAT-"),
-    sg.Radio("رسائل تواصل", "TYPE", key="-TYPE_MSG-")],
+    [sg.Text("Total Messages: 0", key="-TOTAL_COUNT-")],
+    # Message Mode selection
+    [sg.Text("Message Mode:")],
+    [sg.Radio("Fixed Message", "MSG_MODE", key="-MSG_FIXED-", enable_events=True, default=True),
+     sg.Radio("Template", "MSG_MODE", key="-MSG_TEMPLATE-", enable_events=True),
+     sg.Radio("Document Only", "MSG_MODE", key="-MSG_DOC_ONLY-", enable_events=True)],
+     
+    # Dynamic Message Inputs (starts showing fixed message input)
+    [sg.pin(sg.Column([
+        [sg.Text("Fixed Message Content:")],
+        [sg.Multiline("", key="-FIXED_TXT-", size=(40, 4))]
+    ], key="-COL_FIXED-", visible=True))],
+    
+    [sg.pin(sg.Column([
+        [sg.Text("Select Template:")],
+        [sg.Combo(template_keys, key="-SEL_MSG_TEMPLATE-", size=(30, 1), enable_events=True)],
+        [sg.Text("Select Variant (or Random):")],
+        [sg.Combo([], key="-SEL_VARIANT-", size=(30, 1)), sg.Checkbox("Random", key="-CHK_RANDOM_VAR-", default=True)]
+    ], key="-COL_TEMPLATE-", visible=False))],
+
+    # Document Mode selection
+    [sg.Text("Document Mode:")],
+    [sg.Radio("None", "DOC_MODE", key="-DOC_NONE-", enable_events=True, default=True),
+     sg.Radio("Fixed", "DOC_MODE", key="-DOC_FIXED-", enable_events=True),
+     sg.Radio("Variable (Match Contact)", "DOC_MODE", key="-DOC_VAR-", enable_events=True)],
+     
+    # Dynamic Document Inputs
+    [sg.pin(sg.Column([
+        [sg.Text("Select Fixed Document:"), sg.Input(config.get("fixed_doc_path") or "", key="-FIXED_DOC_IN-"), sg.FileBrowse("Browse...")]
+    ], key="-COL_DOC_FIXED-", visible=False))],
     # Message wait time (seconds) – randomized between min & max
-    [sg.Text("انتظار الرسالة (ث):"), 
-     sg.Input(key="-MSG_WAIT_MIN-", size=(5,1), enable_events=True, tooltip="أدني", default_text=5), 
-     sg.Input(key="-MSG_WAIT_MAX-", size=(5,1), enable_events=True, tooltip="أقصي", default_text=10)],
+    [sg.Text("Msg Wait (sec):"), 
+     sg.Input(key="-MSG_WAIT_MIN-", size=(5,1), enable_events=True, tooltip="Minimum", default_text=5), 
+     sg.Input(key="-MSG_WAIT_MAX-", size=(5,1), enable_events=True, tooltip="Maximum", default_text=10)],
     # Batch wait time (minutes) – randomized between min & max
-    [sg.Text("انتظار الجولة (د):"), 
-     sg.Input(key="-BATCH_WAIT_MIN-", size=(5,1), enable_events=True, tooltip="أدني", default_text=10), 
-     sg.Input(key="-BATCH_WAIT_MAX-", size=(5,1), enable_events=True, tooltip="أقصي", default_text=20)],
+    [sg.Text("Batch Wait (min):"), 
+     sg.Input(key="-BATCH_WAIT_MIN-", size=(5,1), enable_events=True, tooltip="Minimum", default_text=10), 
+     sg.Input(key="-BATCH_WAIT_MAX-", size=(5,1), enable_events=True, tooltip="Maximum", default_text=20)],
     # Average batch size (actual size is randomized around this value)
-    [sg.Text("حجم الدفعة:"), sg.Input(key="-BATCH_SIZE-", enable_events=True, default_text=5),],
+    [sg.Text("Batch Size:"), sg.Input(key="-BATCH_SIZE-", enable_events=True, default_text=5),],
     # Per-round stats
-    [sg.Text("عدد الرسائل لكل جولة: 0", key="-TOTAL_PER_ROUND-"),
-     sg.Text("الجولات المتبقية: 0", key="-ROUNDS_LEFT-")],
+    [sg.Text("Messages Per Round: 0", key="-TOTAL_PER_ROUND-"),
+     sg.Text("Rounds Left: 0", key="-ROUNDS_LEFT-")],
     # Estimated remaining execution time
-    [sg.Text("الوقت المتوقع للتنفيذ:"), sg.Text("0 دقيقة", key="-EST_TIME-")],
+    [sg.Text("Estimated Execution Time:"), sg.Text("0 minutes", key="-EST_TIME-")],
     # Progress indicators
-    [sg.Text("تقدم الإرسال:"), sg.Text("0 / 0", key="-PROGRESS_TEXT-")],
+    [sg.Text("Progress:"), sg.Text("0 / 0", key="-PROGRESS_TEXT-")],
     # Horizontal progress bar (updated during execution)
     [sg.ProgressBar(max_value=100, orientation='h', size=(40, 20), key="-PROGRESS-")],
     # Primary execution controls
-    [sg.Button("تنفيذ/استكمال", key="-EXECUTE-"),
-     sg.Button("تحديث الملف", key="-UPDATE_SHEET-"),
-     sg.Button("إلغاء", key="-CANCEL-")],
+    [sg.Button("Execute / Resume", key="-EXECUTE-", size=(15, 2), button_color=("white", "green")),
+     sg.Button("Refresh Data", key="-UPDATE_SHEET-", size=(15, 2)),
+     sg.Button("Cancel", key="-CANCEL-", size=(15, 2), button_color=("white", "red"))],
      # Secondary execution controls
-     [sg.Button("إيقاف مؤقت", key="-PAUSE-"), 
-      sg.Button("إعادة التنفيذ", key="-RESTART-")],
-
+     [sg.Button("Pause", key="-PAUSE-", size=(15, 1)), 
+      sg.Button("Restart", key="-RESTART-", size=(15, 1))]
 ]
 
 # -------------------------------------------------------------------
 # Important Notes Layout
 # -------------------------------------------------------------------
-# Static, read-only instructions meant to:
-# - Reduce user errors
-# - Protect execution integrity
-# - Prevent UI interference during automation
 important_notes_layout = [
     [sg.Multiline(
-        "1- تأكد من اختيار جميع المسارات بشكل صحيح\n"
-        "2- تأكد من غلق ملف Excel قبل التنفيذ\n"
-        "3- لا تغلق التطبيق أثناء التنفيذ\n"
-        "4- تأكد من اختيار العملية الصحيحة قبل الإرسال\n"
-        "5- تأكد من عدم تحريك الماوس بعد بدأ البرنامج\n"
-        "6- تأكد من استخدام الوضع المظلم",
+        "1- Please select the required configuration directories correctly.\n"
+        "2- Ensure the Jobs Data File (CSV) is closed before starting execution.\n"
+        "3- Do not forcibly close the application during processing.\n"
+        "4- Validate the selected operation configurations mode.\n"
+        "5- Please refrain from moving the mouse during GUI macro hooks (if any).\n"
+        "6- Ensure that edge browser starts up in dark mode defaults.",
         size=(40, 6),
         disabled=True,
         no_scrollbar=True,
@@ -153,17 +171,28 @@ important_notes_layout = [
     )]
 ]
 
+# -------------------------------------------------------------------
+# Left Column: Managers & Instructions
+# -------------------------------------------------------------------
+left_col = [
+    [sg.Frame("Typing Speed Profiles", profiles_layout, font=("bold", 10))],
+    [sg.Frame("Template Manager", templates_layout, font=("bold", 10))],
+    [sg.Frame("Important Notes", important_notes_layout, title_color="darkred", font=("bold", 10))]
+]
+# -------------------------------------------------------------------
+# Right Column: Main Execution Flow
+# -------------------------------------------------------------------
+right_col = [
+    [sg.Frame("1. Settings and Paths", paths_layout, font=("bold", 10))],
+    [sg.Frame("2. Operations", ops_layout, font=("bold", 10))]
+]
 
 # -------------------------------------------------------------------
-# Main Window Layout
+# Main Window Layout (Two Columns)
 # -------------------------------------------------------------------
-# The full GUI is composed of framed sections stacked vertically.
-# Each frame represents a logical feature area of the application.
 layout = [
-    [sg.Frame("المسارات", paths_layout)],
-    [sg.Frame("سرعات الكتابة", profiles_layout)],
-    [sg.Frame("إدارة القوالب", templates_layout)],
-    [sg.Frame("ملاحظات هامة", important_notes_layout, title_color="darkred")],
-    [sg.Frame("العمليات", ops_layout)]
+    [sg.Column(right_col, element_justification='c', vertical_alignment='t'), 
+     sg.VSeperator(), 
+     sg.Column(left_col, element_justification='c', vertical_alignment='t')]
 ]
 

@@ -1,10 +1,8 @@
-# WhatsApp Automation System ("منظومة التواصل")
+# WhatsApp Automation System ("Communication System")
 
-## Overview
+The **WhatsApp Automation System** is a professional Python-based desktop automation tool designed to streamline mass messaging on WhatsApp Web. Built with productivity and robustness in mind, it provides a feature-rich graphical interface to manage contacts, automate message delivery, and handle document attachments with human-like precision.
 
-This project is a **WhatsApp automation system** designed to send messages, travel permits, or other documents to officers via WhatsApp Web. The system provides a **GUI interface** for configuration and execution, and a **WAController backend** that automates WhatsApp interactions in a human-like manner.  
-
-The app uses **Excel files** as input for officer data and supports batch sending with randomized delays to reduce bot detection risks. It is designed for Windows, with Chrome or Edge as supported browsers, and assumes WhatsApp Web is logged in (with dark mode).
+Leveraging image-based recognition (through `pyautogui`), the system handles complex WhatsApp Web workflows, ensuring messages reach their destination reliably while simulating natural user behavior (variable typing speeds, random delays, and batch-wise processing) to prevent detection risks. It is designed for Windows, with Chrome or Edge as supported browsers, and assumes WhatsApp Web is logged in (with dark mode).
 
 ---
 
@@ -36,8 +34,7 @@ The app uses **Excel files** as input for officer data and supports batch sendin
 
 The system is organized in **layers** for maintainability and separation of concerns:
 
-```
-
+```text
 GUI Layer (gui/)            → Handles all user interaction
 ├─ layout.py             → Defines GUI layout
 ├─ events.py             → Handles GUI events and interactions
@@ -52,8 +49,7 @@ Automation Layer (app/WAController.py + Controller.py)
 
 Assets (assets/)            → Reference images used for WhatsApp Web image-based automation
 Logs (logs/)                → Stores execution and error logs
-
-````
+```
 
 ---
 
@@ -65,7 +61,7 @@ Logs (logs/)                → Stores execution and error logs
      - Permits directory
      - Seglat directory
    - Optionally manages typing/timing profiles (Fast, Normal, Slow, Distracted)
-   
+
 2. **Validation**
    - GUI validates required fields (batch size, wait times, profile selection)
    - Numeric and logical constraints are checked (min < max for waits)
@@ -97,27 +93,30 @@ Logs (logs/)                → Stores execution and error logs
 ## Installation & Requirements
 
 ### System Requirements
+
 - Windows OS (tested)
 - Chrome (required) / Edge (optional)
 - WhatsApp Web logged in (dark mode)
 - Stable screen resolution, UI scaling 100%
 
 ### Python Requirements
+
 - Python 3.8+
 - Required packages:
-  ```bash
-  pip install FreeSimpleGUI pandas openpyxl pyautogui pyperclip opencv-python
-````
 
-* Optional but recommended: `logger.py` for function-level logging
+```bash
+pip install FreeSimpleGUI pandas openpyxl pyautogui pyperclip opencv-python
+```
+
+- Optional but recommended: `logger.py` for function-level logging
 
 ### Assets
 
-* All images required for WhatsApp UI recognition must be placed in `assets/`
-* Images must match the resolution and UI theme (dark mode, English & Arabic)
-* Example structure:
+- All images required for WhatsApp UI recognition must be placed in `assets/`
+- Images must match the resolution and UI theme (dark mode, English & Arabic)
+- Example structure:
 
-```
+```text
 assets/
     ├── WA.PNG
     ├── WA AR.PNG
@@ -146,7 +145,7 @@ assets/
     └── File Sent.PNG
 ```
 
-* Arabic variants are suffixed with `AR.PNG`
+- Arabic variants are suffixed with `AR.PNG`
 
 ---
 
@@ -160,61 +159,61 @@ assets/
 
 2. **Configure Paths**
 
-   * Select Excel input file
-   * Select Permits directory
-   * Select Seglat directory
-   * Click **"تأكيد المسارات"** to save
+   - Select Excel input file
+   - Select Permits directory
+   - Select Seglat directory
+   - Click **"Confirm Paths"** to save
 
 3. **Manage Typing/Timing Profiles**
 
-   * Add/Edit/Delete profiles
-   * Preview execution timing for selected profile
+   - Add/Edit/Delete profiles
+   - Preview execution timing for selected profile
 
 4. **Configure Execution**
 
-   * Set batch size
-   * Set message wait time (`MSG_WAIT_MIN/MAX`)
-   * Set batch wait time (`BATCH_WAIT_MIN/MAX`)
-   * Choose document type (`permit`, `seglat`, or `msg`)
+   - Set batch size
+   - Set message wait time (`MSG_WAIT_MIN/MAX`)
+   - Set batch wait time (`BATCH_WAIT_MIN/MAX`)
+   - Choose document type (`permit`, `seglat`, or `msg`)
 
 5. **Run Execution**
 
-   * Click **تحديث الملف**
-   * Click **تنفيذ/استكمال**
-   * Monitor progress bar and estimated time
-   * Pause with **إيقاف مؤقت**, restart with **إعادة التنفيذ**, or cancel with **إلغاء** when needed
+   - Click **Update Sheet**
+   - Click **Execute / Resume**
+   - Monitor progress bar and estimated time
+   - Pause with **Pause**, restart with **Restart**, or cancel with **Cancel** when needed
 
 6. **Follow Instructions**
 
-   * Detailed instructions accessible via **التعليمات** button
-   * Keep Excel file closed during execution
-   * Avoid moving mouse during automation
+   - Detailed instructions accessible via **Instructions** button
+   - Keep Excel file closed during execution
+   - Avoid moving mouse during automation
 
 ---
 
 ## Contributing
 
-* **Adding new document types**: Extend `WAController.send_content()`
-* **New message templates**: Add in `WAController.get_msg()`
-* **Browser/accounts support**: Modify `WAController.accounts` list
-* **Improve image detection**: Update assets in `assets/`
-* **Timing profiles**: Add or tweak human-like randomization in `helpers.py`
+- **Adding new document types**: Extend `WAController.send_content()`
+- **New message templates**: Add in `WAController.get_msg()`
+- **Browser/accounts support**: Modify `WAController.accounts` list
+- **Improve image detection**: Update assets in `assets/`
+- **Timing profiles**: Add or tweak human-like randomization in `helpers.py`
 
 ---
 
 ## Known Issues / Limitations
 
-* Designed for **WhatsApp Web in dark mode**
-* Windows-only tested (paths may need adjustments for Linux/macOS)
-* High-volume execution may still trigger WhatsApp anti-bot detection
-* UI changes in WhatsApp Web may require new screenshots in `assets/`
-* GUI must not be interacted with during automation
+- Designed for **WhatsApp Web in dark mode**
+- Windows-only tested (paths may need adjustments for Linux/macOS)
+- High-volume execution may still trigger WhatsApp anti-bot detection
+- UI changes in WhatsApp Web may require new screenshots in `assets/`
+- GUI must not be interacted with during automation
 
 ---
 
 ## File Structure
 
-```
+```text
 C:.
 │   app_main.pyw
 │   config.json

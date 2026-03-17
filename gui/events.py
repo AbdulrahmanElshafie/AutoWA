@@ -57,13 +57,13 @@ def handle_events(event, values, window):
     # Uses a global variable 'running' for external access if needed. 
     global running
 
-    # --- Update paths configuration ---
     if event == "-CONFIRM_PATHS-":
-        config["permits_dir"] = values["-DIR1-"]
-        config["seglat_dir"] = values["-DIR2-"]
+        config["doc_dir"] = values["-DOC_DIR-"]
+        config["fixed_doc_path"] = values["-FIXED_DOC_IN-"]
         config["sheet_file"] = values["-SHEET-"]
+        config["browsers"] = values["-BROWSERS-"]
         save_config(config)
-        sg.popup("تم حفظ المسارات") # Notify user paths saved
+        sg.popup("Paths saved successfully!") # Notify user paths saved
 
     # --- Update typing speed profile preview ---
     elif event == "-PROFILE-":
@@ -71,36 +71,39 @@ def handle_events(event, values, window):
         p = config["time_profiles"].get(name)
         if p:
             # Display profile values in multiline box
-            txt = "\n".join([f"{k}: {v} ثانية" for k,v in p.items()])
+            txt = "\n".join([f"{k}: {v} sec" for k,v in p.items()])
             window["-PROFILE_PREVIEW-"].update(txt)
 
     # --- Recalculate estimated execution time and update counts ---
-    elif event in ("-MSG_WAIT_MIN-", "-MSG_WAIT_MAX-", "-BATCH_WAIT_MIN-", "-BATCH_WAIT_MAX-", "-BATCH_SIZE-", "-UPDATE_SHEET-"):
+    elif event in ("-MSG_WAIT_MIN-", "-MSG_WAIT_MAX-", "-BATCH_WAIT_MIN-", "-BATCH_WAIT_MAX-", "-BATCH_SIZE-", "-UPDATE_SHEET-", "-BROWSERS-"):
         sheet = config.get("sheet_file")
         if sheet and os.path.exists(sheet):
             df_full = pd.read_csv(sheet)
             refresh_total_count(window, df_full) # Update total record count
         else:
-            sg.popup("ملف الإدخال غير موجود")
+            if event == "-UPDATE_SHEET-": # Only show popup on button click, not just writing to wait times.
+                sg.popup("Input data file not found.")
 
         # Compute average wait times per msg and per batch
         avg_msg_wait = 0
         avg_batch_wait = 0
-        if values["-MSG_WAIT_MIN-"] and values["-MSG_WAIT_MAX-"]:
+        if values.get("-MSG_WAIT_MIN-") and values.get("-MSG_WAIT_MAX-"):
             avg_msg_wait = (float(values["-MSG_WAIT_MIN-"]) + float(values["-MSG_WAIT_MAX-"])) / 2
-        if values["-BATCH_WAIT_MIN-"] and values["-BATCH_WAIT_MAX-"]:
+        if values.get("-BATCH_WAIT_MIN-") and values.get("-BATCH_WAIT_MAX-"):
             avg_batch_wait = ( (float(values["-BATCH_WAIT_MIN-"]) + float(values["-BATCH_WAIT_MAX-"])) / 2 ) * 60
+
+        num_accounts = len(values.get("-BROWSERS-") or [1])
 
         # Update estimated time label
         est = estimate_time(window["-TOTAL_COUNT-"].DisplayText.split(": ")[1],
-                            values["-BATCH_SIZE-"], avg_msg_wait, avg_batch_wait)
+                            values.get("-BATCH_SIZE-", 5), avg_msg_wait, avg_batch_wait, num_accounts)
         window["-EST_TIME-"].update(est)
         
         # Update total rows sent per round and rounds left
         try:
             # Calculate the total rows per round and the required rounds to finish
-            batch_size = int(values["-BATCH_SIZE-"])
-            total_per_round = batch_size * 2
+            batch_size = int(values.get("-BATCH_SIZE-", 5))
+            total_per_round = batch_size * num_accounts
             total_rows = int(window["-TOTAL_COUNT-"].DisplayText.split(": ")[1])
             rounds_left = math.ceil(total_rows / total_per_round) if total_per_round > 0 else 0
         except:
@@ -108,16 +111,16 @@ def handle_events(event, values, window):
             rounds_left = 0
 
         # Update the UI
-        display_total = "أكثر من 99" if total_per_round > 99 else str(total_per_round)
-        window["-TOTAL_PER_ROUND-"].update(f"عدد السجلات لكل جولة: {display_total}")
-        window["-ROUNDS_LEFT-"].update(f"الجولات المتبقية: {rounds_left}")
+        display_total = "More than 99" if total_per_round > 99 else str(total_per_round)
+        window["-TOTAL_PER_ROUND-"].update(f"Messages Per Round: {display_total}")
+        window["-ROUNDS_LEFT-"].update(f"Rounds Left: {rounds_left}")
 
     # --- Add or edit typing speed profile ---
-    elif event in ("إضافة ملف سرعة الكتابة", "تعديل ملف سرعة الكتابة"):
-        if event == "تعديل ملف سرعة الكتابة":
+    elif event in ("Add Profile", "Edit Profile"):
+        if event == "Edit Profile":
             name = values["-PROFILE-"]
             if not name:
-                sg.popup("اختر ملف سرعة الكتابة لتعديله")
+                sg.popup("Select a typing speed profile to edit.")
                 return
             existing = config["time_profiles"].get(name, {})
         else:
@@ -126,18 +129,18 @@ def handle_events(event, values, window):
 
         # Layout for modal input window
         layout_p = [
-            [sg.Text("الاسم"), sg.Input(name, key="-N-")],
-            [sg.Text("سريع"), sg.Input(existing.get("fast",""), key="-FAST_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-FAST_UNIT-")],
-            [sg.Text("عادي"), sg.Input(existing.get("normal",""), key="-NORMAL_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-NORMAL_UNIT-")],
-            [sg.Text("بطيء"), sg.Input(existing.get("slow",""), key="-SLOW_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-SLOW_UNIT-")],
-            [sg.Text("مشتت"), sg.Input(existing.get("distracted",""), key="-DISTRACTED_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-DISTRACTED_UNIT-")],
-            [sg.Button("حفظ"), sg.Button("إلغاء")]
+            [sg.Text("Name:"), sg.Input(name, key="-N-")],
+            [sg.Text("Fast"), sg.Input(existing.get("fast",""), key="-FAST_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-FAST_UNIT-")],
+            [sg.Text("Normal"), sg.Input(existing.get("normal",""), key="-NORMAL_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-NORMAL_UNIT-")],
+            [sg.Text("Slow"), sg.Input(existing.get("slow",""), key="-SLOW_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-SLOW_UNIT-")],
+            [sg.Text("Distracted"), sg.Input(existing.get("distracted",""), key="-DISTRACTED_VAL-"), sg.Combo(["ms","s","m"], default_value="s", key="-DISTRACTED_UNIT-")],
+            [sg.Button("Save"), sg.Button("Cancel")]
         ]
-        pw = sg.Window("ملف سرعة الكتابة", layout_p, modal=True)
+        pw = sg.Window("Typing Speed Profile", layout_p, modal=True)
         e,v = pw.read()
-        if e == "حفظ":
+        if e == "Save":
             # Remove old profile name if renamed
-            if event == "تعديل ملف سرعة الكتابة" and name != v["-N-"]:
+            if event == "Edit Profile" and name != v["-N-"]:
                 config["time_profiles"].pop(name, None)
             # Save profile values in seconds
             config["time_profiles"][v["-N-"]] = {
@@ -151,19 +154,19 @@ def handle_events(event, values, window):
             # Update the selection options in the UI
             window["-PROFILE-"].update(values=list(config["time_profiles"].keys()), value=v["-N-"])
             # Refresh preview
-            txt = "\n".join([f"{k}: {v} ثانية" for k,v in config["time_profiles"][v["-N-"]].items()])
+            txt = "\n".join([f"{k}: {v} sec" for k,v in config["time_profiles"][v["-N-"]].items()])
             window["-PROFILE_PREVIEW-"].update(txt)
         pw.close()
 
     # --- Delete typing speed profile ---
-    elif event == "حذف ملف سرعة الكتابة":
+    elif event == "Delete Profile":
         name = values["-PROFILE-"]
         # Make sure a profile is selected
         if not name:
-            sg.popup("اختر ملف سرعة الكتابة للحذف")
+            sg.popup("Select a typing speed profile to delete.")
         else:
             # Confirm before deletion
-            if sg.popup_yes_no(f"هل أنت متأكد من حذف {name}?") == "Yes":
+            if sg.popup_yes_no(f"Are you sure you want to delete {name}?") == "Yes":
                 # Delete the profile
                 config["time_profiles"].pop(name, None)
                 save_config(config)
@@ -181,79 +184,93 @@ def handle_events(event, values, window):
         else:
             window["-VARIANTS_LIST-"].update(values=[])
             
-    elif event == "إضافة قالب":
+    elif event == "Add Template":
         messages = load_messages()
-        t_name = sg.popup_get_text("اسم القالب الجديد (مثال: permit_msg):")
+        t_name = sg.popup_get_text("New template code name (e.g. permit_msg):")
         if t_name:
-            t_title = sg.popup_get_text("عنوان القالب:")
+            t_title = sg.popup_get_text("Template display title:")
             if t_title:
                 messages[t_name] = {"title": t_title, "enabled": True, "variants": []}
                 save_messages(messages)
                 window["-TEMPLATE_SELECT-"].update(values=list(messages.keys()), value=t_name)
                 window["-VARIANTS_LIST-"].update(values=[])
 
-    elif event == "تعديل قالب":
+    elif event == "Edit Template":
         messages = load_messages()
         selected = values["-TEMPLATE_SELECT-"]
         if selected and selected in messages:
-            t_title = sg.popup_get_text("عنوان القالب الجديد:", default_text=messages[selected].get("title", ""))
+            t_title = sg.popup_get_text("New template display title:", default_text=messages[selected].get("title", ""))
             if t_title:
                 messages[selected]["title"] = t_title
                 save_messages(messages)
         else:
-            sg.popup("الرجاء اختيار قالب لتعديله")
+            sg.popup("Please select a template to edit.")
 
-    elif event == "حذف قالب":
+    elif event == "Delete Template":
         messages = load_messages()
         selected = values["-TEMPLATE_SELECT-"]
         if selected and selected in messages:
-            if sg.popup_yes_no(f"هل أنت متأكد من حذف القالب {selected}؟") == "Yes":
+            if sg.popup_yes_no(f"Are you sure you want to delete the template {selected}?") == "Yes":
                 messages.pop(selected)
                 save_messages(messages)
                 window["-TEMPLATE_SELECT-"].update(values=list(messages.keys()), value="")
                 window["-VARIANTS_LIST-"].update(values=[])
         else:
-            sg.popup("الرجاء اختيار قالب لحذفه")
+            sg.popup("Please select a template to delete.")
 
-    elif event == "إضافة متغير":
+    elif event == "Add Variant":
         messages = load_messages()
         selected = values["-TEMPLATE_SELECT-"]
         if selected and selected in messages:
-            variant = sg.popup_get_text("النص المتغير:")
+            variant = sg.popup_get_text("Variant body text:")
             if variant:
                 messages[selected].setdefault("variants", []).append(variant)
                 save_messages(messages)
                 window["-VARIANTS_LIST-"].update(values=messages[selected]["variants"])
         else:
-            sg.popup("الرجاء اختيار قالب أولاً")
+            sg.popup("Please select a template first.")
 
-    elif event == "تعديل متغير":
+    elif event == "Edit Variant":
         messages = load_messages()
         selected_temp = values["-TEMPLATE_SELECT-"]
         selected_vars = values["-VARIANTS_LIST-"]
         if selected_temp and selected_temp in messages and selected_vars:
             old_variant = selected_vars[0]
-            new_variant = sg.popup_get_text("النص المتغير الجديد:", default_text=old_variant)
+            new_variant = sg.popup_get_text("New variant body text:", default_text=old_variant)
             if new_variant:
                 idx = messages[selected_temp]["variants"].index(old_variant)
                 messages[selected_temp]["variants"][idx] = new_variant
                 save_messages(messages)
                 window["-VARIANTS_LIST-"].update(values=messages[selected_temp]["variants"])
         else:
-            sg.popup("الرجاء اختيار قالب ومتغير لتعديله")
+            sg.popup("Please select a template and a variant to edit.")
 
-    elif event == "حذف متغير":
+    elif event == "Delete Variant":
         messages = load_messages()
         selected_temp = values["-TEMPLATE_SELECT-"]
         selected_vars = values["-VARIANTS_LIST-"]
         if selected_temp and selected_temp in messages and selected_vars:
             old_variant = selected_vars[0]
-            if sg.popup_yes_no("هل أنت متأكد من حذف هذا المتغير؟") == "Yes":
+            if sg.popup_yes_no("Are you sure you want to delete this variant?") == "Yes":
                 messages[selected_temp]["variants"].remove(old_variant)
                 save_messages(messages)
                 window["-VARIANTS_LIST-"].update(values=messages[selected_temp]["variants"])
         else:
-            sg.popup("الرجاء اختيار قالب ومتغير لحذفه")
+            sg.popup("Please select a template and a variant to delete.")
+
+    # --- Mode Visibility Toggles ---
+    elif event in ("-MSG_FIXED-", "-MSG_TEMPLATE-", "-MSG_DOC_ONLY-"):
+        window["-COL_FIXED-"].update(visible=values["-MSG_FIXED-"])
+        window["-COL_TEMPLATE-"].update(visible=values["-MSG_TEMPLATE-"])
+    
+    elif event in ("-DOC_NONE-", "-DOC_FIXED-", "-DOC_VAR-"):
+        window["-COL_DOC_FIXED-"].update(visible=values["-DOC_FIXED-"])
+        
+    elif event == "-SEL_MSG_TEMPLATE-":
+        messages = load_messages()
+        cur_t = values["-SEL_MSG_TEMPLATE-"]
+        if cur_t in messages:
+            window["-SEL_VARIANT-"].update(values=messages[cur_t]["variants"])
 
     # --- Execute sending msgs and its controls ---
     elif event == "-EXECUTE-":
@@ -279,9 +296,10 @@ def handle_events(event, values, window):
         return None
 
      # --- Restart the msgs sending process from zero ---
+    
     elif event == "-RESTART-":  
         # Confirm the restart command
-        if sg.popup_yes_no("هل تريد إعادة التنفيذ من البداية؟")=="Yes": 
+        if sg.popup_yes_no("Are you sure you want to restart execution from entirely scratch?")=="Yes": 
             # Get the current progress from the input file
             excel_file_path = config.get("sheet_file")
             if excel_file_path and os.path.exists(excel_file_path):
@@ -293,7 +311,7 @@ def handle_events(event, values, window):
                     df['status_message'] = ''
                 df.to_csv(excel_file_path, index=False)
                 # Notify the user that the restart is ready
-                sg.popup("تم تهيئة السجلات للبداية من جديد")
+                sg.popup("Records have been reset successfully.")
                 # Turn on the pause option
                 window["-PAUSE-"].update(disabled=False)
                 # Turn off the execution/resume option
@@ -302,7 +320,7 @@ def handle_events(event, values, window):
             
             else:
                 # If the input file is not found 
-                sg.popup("ملف الإدخال غير موجود")
+                sg.popup("Input data file not found.")
                 return None
 
     # --- Display instructions ---
@@ -312,7 +330,7 @@ def handle_events(event, values, window):
         # Open a popup for the instructions 
         sg.popup_scrolled(
             instructions_text,
-            title="تعليمات استخدام التطبيق",
+            title="Application Instructions",
             size=(70, 20),
             font=("bold", 12)
         )   

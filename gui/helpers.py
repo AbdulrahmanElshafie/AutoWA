@@ -114,7 +114,7 @@ def to_seconds(val, unit):
         return 0
 
 @log_function
-def estimate_time(actual_rows, batch_size, msg_wait, batch_wait):
+def estimate_time(actual_rows, batch_size, msg_wait, batch_wait, num_accounts=1):
     """
     Estimate the total execution time for sending messages in batches.
 
@@ -123,9 +123,10 @@ def estimate_time(actual_rows, batch_size, msg_wait, batch_wait):
         batch_size (int/str): Number of messages per batch.
         msg_wait (float/str): Delay between individual messages in seconds.
         batch_wait (float/str): Delay between batches in seconds.
+        num_accounts (int): Number of selected WhatsApp accounts to run in cycle.
 
     Returns:
-        str: Estimated execution time as a string, e.g., "12.5 دقيقة" (minutes).
+        str: Estimated execution time as a string, e.g., "12.5 minutes".
     """
     # Validate the values sent are numbers
     try:
@@ -134,11 +135,11 @@ def estimate_time(actual_rows, batch_size, msg_wait, batch_wait):
         msg_wait = float(msg_wait)
         batch_wait = float(batch_wait)
     except:
-        return "0 دقيقة"
+        return "0 minutes"
 
     # Calculate the number of messages sent per round (rows_per_round)
-    # as the minimum of  actual_rows or batch_size * 2
-    rows_per_round = min(actual_rows or 1, batch_size * 2) if actual_rows else batch_size * 2 # number of rows sent per round for all batches in the round
+    # as the minimum of actual_rows or batch_size * num_accounts
+    rows_per_round = min(actual_rows or 1, batch_size * num_accounts) if actual_rows else batch_size * num_accounts # number of rows sent per round for all batches in the round
     # Calculate the number of rounds needed to send all rows.
     rounds = math.ceil(actual_rows/(rows_per_round)) 
     # Short delay: time between individual messages in the round
@@ -148,8 +149,8 @@ def estimate_time(actual_rows, batch_size, msg_wait, batch_wait):
     # Total time = base time (rows_per_round * 60) + short delays + long delays
     total_time_in_seconds = rows_per_round * 60 + short_time_per_msg + long_time_per_round # total time
     
-    # If any parameter conversion fails, return "0 دقيقة"
-    return f"{total_time_in_seconds / 60:.1f} دقيقة"
+    # If any parameter conversion fails, return "0 minutes"
+    return f"{total_time_in_seconds / 60:.1f} minutes"
 
 @log_function
 def refresh_total_count(window, df):
@@ -168,7 +169,7 @@ def refresh_total_count(window, df):
     # Calculates the number of rows in the DataFrame.
     total_rows_count  = len(df)
     # Updates the GUI element '-TOTAL_COUNT-' to reflect the current total.
-    window["-TOTAL_COUNT-"].update(f"عدد السجلات: {total_rows_count }")
+    window["-TOTAL_COUNT-"].update(f"Total Messages: {total_rows_count }")
 
     
 def load_instructions(file_path="gui\\instructions.txt"):
@@ -180,7 +181,7 @@ def load_instructions(file_path="gui\\instructions.txt"):
 
     Returns:
         str: Contents of the instructions file.
-             If file is missing, returns "ملف التعليمات غير موجود."
+             If file is missing, returns "Instructions file not found."
     """
     try:
         # Tries to open the file with UTF-8 encoding
@@ -189,4 +190,4 @@ def load_instructions(file_path="gui\\instructions.txt"):
             return f.read()
     except FileNotFoundError:
         # Handles FileNotFoundError gracefully by returning a default message.
-        return "ملف التعليمات غير موجود."
+        return "Instructions file not found."

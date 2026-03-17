@@ -67,35 +67,6 @@ class GuiController:
         return candidates
 
     @log_function
-    def get_ar_version(self, obj):
-        """
-        Retrieve the Arabic-version image path for a UI element if it exists.
-
-        This method follows a naming convention where Arabic UI images
-        are suffixed with " AR" before the file extension.
-
-        Example:
-            button.png -> button AR.png
-
-        Args:
-            obj (str):
-                Path to the original image file.
-
-        Returns:
-            str or None:
-                Path to the Arabic-version image if found, otherwise None.
-        """
-        # Get the filename without the extenstion
-        obj_name, obj_extension = obj.split('.')
-
-         # Construct Arabic-version filename
-        ar_version_path = os.path.join(obj_name + " AR." + obj_extension)
-
-        # Return only if the file exists
-        if os.path.exists(ar_version_path):
-            return ar_version_path
-
-    @log_function
     def is_ui_stable(self, delay=2, diff_threshold=2.5):
         """
         Detects whether the UI has stabilized by comparing two screenshots.
@@ -114,10 +85,6 @@ class GuiController:
     def find_click(self, obj, confidence=0.8, raise_on_fail=True, max_attemps=2, max_wait=3):
         """
         Locate an image on the screen and click its center.
-
-        The method attempts to find:
-        1. The original image
-        2. Its Arabic-version alternative (if available)
 
         Each image is retried multiple times before moving to the next option.
 
@@ -175,7 +142,7 @@ class GuiController:
             # If raise is provided then icon is important and has to be saved otherwise it's not
             screenshot = self.IconManagerController.capture_failure(os.path.basename(obj))
             # self.IconManagerController.learn_icon(obj, screenshot)
-            raise pyautogui.ImageNotFoundException(f'غير قادر علي العثور علي ايكونة: {os.path.basename(obj)}')
+            raise pyautogui.ImageNotFoundException(f'Unable to find icon: {os.path.basename(obj)}')
 
     @log_function   
     def type(self, txt):
@@ -264,8 +231,6 @@ class GuiController:
         Wait for a specific UI condition to appear on screen.
 
         The function repeatedly checks for the presence of an image.
-        If not found, it retries and optionally switches to the
-        Arabic-version image.
 
         Args:
             condition_img (str):

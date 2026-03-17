@@ -6,9 +6,9 @@ from PIL import Image
 from logger import log_function
 
 class IconManager:
-    assets_dir = "C:\\Users\\PC\\Desktop\\Scripts_Updates\\New Script\\assets\\"
-    learn_assets_dir = "C:\\Users\\PC\\Desktop\\Scripts_Updates\\New Script\\learned_assets\\"
-    meta_path = "C:\\Users\\PC\\Desktop\\Scripts_Updates\\New Script\\learned_assets\\metadata.json"
+    assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets")
+    learn_assets_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "learned_assets")
+    meta_path = os.path.join(learn_assets_dir, "metadata.json")
 
     @log_function
     def load_metadata(self,):

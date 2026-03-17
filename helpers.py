@@ -59,14 +59,14 @@ def validate_inputs(values):
     - Shows popups for errors and returns False on validation failure.
     """
     required_fields = {
-        "-BATCH_SIZE-": "حجم الدفعة",
-        "-MSG_WAIT_MIN-": "انتظار الرسالة (ث)",
-        "-MSG_WAIT_MAX-": "انتظار الرسالة (ث)",
-        "-BATCH_WAIT_MIN-": "انتظار الدفعة (ث)",
-        "-BATCH_WAIT_MAX-": "انتظار الدفعة (ث)",
-        "-PROFILE-": "ملف التوقيت",
+        "-BATCH_SIZE-": "Batch Size",
+        "-MSG_WAIT_MIN-": "Msg Wait (sec)",
+        "-MSG_WAIT_MAX-": "Msg Wait (sec)",
+        "-BATCH_WAIT_MIN-": "Batch Wait (min)",
+        "-BATCH_WAIT_MAX-": "Batch Wait (min)",
+        "-PROFILE-": "Timing Profile",
     }
-    error_msg = "الرجاء ملء الحقل: "
+    error_msg = "Please fill the field: "
     valid = True
     
     # Check the existence of of values for the required fields
@@ -87,16 +87,16 @@ def validate_inputs(values):
         float(values["-BATCH_WAIT_MIN-"])
         float(values["-BATCH_WAIT_MAX-"])
     except ValueError:
-        sg.popup("الرجاء إدخال أرقام صالحة في حقول الانتظار وحجم الدفعة.")
+        sg.popup("Please enter valid numeric values in time wait and batch fields.")
         return False
     
     # Ensure minimums are less than maximums
     if float(values["-MSG_WAIT_MIN-"]) >= float(values["-MSG_WAIT_MAX-"]):
-        sg.popup("الحد الأدني لحقل انتظار الرسائل يجب أن يكون أقل من الحد الأقصي")
+        sg.popup("Minimum message wait time must be less than the maximum limit.")
         return False
 
     if float(values["-BATCH_WAIT_MIN-"]) >= float(values["-BATCH_WAIT_MAX-"]):
-        sg.popup("الحد الأدني لحقل انتظار الدفعة يجب أن يكون أقل من الحد الأقصي")
+        sg.popup("Minimum batch wait time must be less than the maximum limit.")
         return False
 
     return True
@@ -105,7 +105,22 @@ def validate_inputs(values):
 def run_execution(values, window):
     excel_file_path = config.get("sheet_file")
     if not excel_file_path or not os.path.exists(excel_file_path):
-        sg.popup("ملف الإدخال غير موجود")
+        sg.popup("Input data file not found.")
+        events.running = False
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+        return
+
+    # Pass GUI execution parameters to the backend
+    try:
+        config["batch_size"] = int(values.get("-BATCH_SIZE-", 5))
+        config["msg_wait_min"] = float(values.get("-MSG_WAIT_MIN-", 5))
+        config["msg_wait_max"] = float(values.get("-MSG_WAIT_MAX-", 10))
+        config["batch_wait_min"] = float(values.get("-BATCH_WAIT_MIN-", 10))
+        config["batch_wait_max"] = float(values.get("-BATCH_WAIT_MAX-", 20))
+        config["browsers"] = values.get("-BROWSERS-", ["Default Browser"])
+        save_config(config)
+    except Exception as e:
+        sg.popup(f"Failed to save execution configuration: {str(e)}")
         events.running = False
         window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
         return
@@ -120,9 +135,49 @@ def run_execution(values, window):
 
     try:
         df = pd.read_csv(excel_file_path)
+        
+        # Override columns based on GUI MessageMode
+        if values.get("-MSG_FIXED-"):
+            df["message_mode"] = "fixed"
+            df["message_text"] = values.get("-FIXED_TXT-", "")
+            df["message_key"] = ""
+        elif values.get("-MSG_TEMPLATE-"):
+            df["message_mode"] = "template"
+            df["message_text"] = ""
+            df["message_key"] = values.get("-SEL_MSG_TEMPLATE-", "")
+        elif values.get("-MSG_DOC_ONLY-"):
+            df["message_mode"] = "doc_only"
+            df["message_text"] = ""
+            df["message_key"] = ""
+            
+        # Override columns based on GUI DocMode
+        if values.get("-DOC_NONE-"):
+            df["doc_mode"] = "none"
+            df["doc_path"] = ""
+        elif values.get("-DOC_FIXED-"):
+            df["doc_mode"] = "fixed"
+            df["doc_path"] = "" # handled by fixed_doc_path in config.json
+        elif values.get("-DOC_VAR-"):
+            df["doc_mode"] = "variable"
+            # We assume the name/number is appended to the doc_dir logically later, 
+            # but we can set the base info here or just let the resolver handle the building
+            # If doc_path column doesn't exist, we must add it as per schema
+            if "doc_path" not in df.columns:
+                df["doc_path"] = ""
+                
+        # Fill missing schemas required columns
+        for col in ["number", "contact_name", "status", "status_message"]:
+            if col not in df.columns:
+                df[col] = "" if col != "status" else "pending"
+                
+        # Re-save the overriden definitions back so the engine reads them!
+        df.to_csv(excel_file_path, index=False)
         total_rows = len(df)
-    except:
-        total_rows = 1
+    except Exception as e:
+        sg.popup(f"An error occurred loading job execution settings: {str(e)}")
+        events.running = False
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+        return
 
     window["-PROGRESS-"].update(current_count=0, max=total_rows)
 

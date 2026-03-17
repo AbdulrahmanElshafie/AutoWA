@@ -1,7 +1,7 @@
 """
 app_main.py
 
-Main entry point for the WhatsApp Messaging GUI application ("منظومة التواصل").
+Main entry point for the WhatsApp Messaging GUI application ("Communication System").
 
 Responsibilities:
 - Initialize the FreeSimpleGUI window with the layout defined in gui.layout.
@@ -35,12 +35,13 @@ from helpers import *
 from logger import enable_console_logging
 import logging
 import threading
+from helpers import run_execution
 
 # Enable console logging for errors only
 enable_console_logging(level=logging.ERROR)
 
 # Initialize the main GUI window
-window = sg.Window("منظومة التواصل v1.5.1 Alpha", layout, finalize=True)
+window = sg.Window("Communication System v1.5.1 Alpha", layout, finalize=True)
 
 # Reference for background execution thread
 exec_thread = None  # thread reference
@@ -55,27 +56,27 @@ while True:
         status, successfully_sent, pending_send, failed_send, wait_time = values[event]  # status can be "DONE", "PAUSED", or "ERROR"
     
         # Create text for the stats
-        success_text = f"تم إرسال {successfully_sent} بنجاح"
-        pending_text = f"متبقي إرسال {pending_send}"
-        fail_text = f"فشل إرسال {failed_send}"
+        success_text = f"{successfully_sent} sent successfully"
+        pending_text = f"{pending_send} remaining"
+        fail_text = f"{failed_send} failed"
         # Display different popup messages based on status
         if status == "DONE":
-            sg.popup("تم الانتهاء من عملية الإرسال", success_text, pending_text, fail_text)  # Display the styled stats
+            sg.popup("Sending process completed", success_text, pending_text, fail_text)  # Display the styled stats
         elif status == "PAUSED":
-            sg.popup("تم إيقاف التنفيذ مؤقتًا", success_text, pending_text, fail_text)
+            sg.popup("Execution paused", success_text, pending_text, fail_text)
         elif status == "ERROR":
-            sg.popup("حدث خطأ أثناء التنفيذ")  # Notify user of execution error
+            sg.popup("An error occurred during execution")  # Notify user of execution error
         continue  # Skip further event handling
 
     if event == "-BATCH BREAK-":
         successfully_sent, pending_send, failed_send, wait_time = values[event] 
 
         # Create text for the stats
-        success_text = f"تم إرسال {successfully_sent} بنجاح"
-        pending_text = f"متبقي إرسال {pending_send}"
-        fail_text = f"فشل إرسال {failed_send}"
+        success_text = f"{successfully_sent} sent successfully"
+        pending_text = f"{pending_send} remaining"
+        fail_text = f"{failed_send} failed"
 
-        create_notification("فاصل بين الدفعات", wait_time, success_text, pending_text, fail_text)
+        create_notification("Batch Break", wait_time, success_text, pending_text, fail_text)
 
 
     # --- Delegate event handling to events.py ---
@@ -88,14 +89,14 @@ while True:
 
     # --- Handle CANCEL action ---
     if action == "CANCEL":
-        if sg.popup_yes_no("هل تريد الخروج؟") == "Yes":
+        if sg.popup_yes_no("Do you want to exit?") == "Yes":
             events.running = False 
             break
 
     # --- Handle EXECUTE action ---
     elif action == "EXECUTE":
         if events.running:
-            sg.popup("التنفيذ جارٍ بالفعل!") # Prevent multiple executions
+            sg.popup("Execution is already in progress!") # Prevent multiple executions
         else:
             # Validate user inputs before starting
             if not validate_inputs(values):
@@ -117,7 +118,7 @@ while True:
     # --- Handle RESTART action ---
     elif action == "RESTART":
         if events.running:
-            sg.popup("يرجى إيقاف التنفيذ أولاً قبل إعادة التشغيل") # Prevent restart during active execution
+            sg.popup("Please stop execution first before restarting") # Prevent restart during active execution
         else:
             # Validate user inputs before restarting
             if not validate_inputs(values):

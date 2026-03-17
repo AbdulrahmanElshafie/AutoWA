@@ -1,0 +1,29 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# VSCode / IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+logs/*
+
+# Config files
+config/*
+
+# Assets
+learned_assets/*
+pareto_errors/*
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
