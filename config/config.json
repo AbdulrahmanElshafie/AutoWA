@@ -1,0 +1,22 @@
+{
+    "sheet_file": "D:/AutoWA/data/jobs.csv",
+    "time_profiles": {
+        "p1": {
+            "fast": 5.0,
+            "normal": 10.0,
+            "slow": 15.0,
+            "distracted": 20.0
+        }
+    },
+    "doc_dir": "",
+    "fixed_doc_path": "",
+    "browsers": [
+        "Chrome",
+        "Edge"
+    ],
+    "batch_size": 5,
+    "msg_wait_min": 5.0,
+    "msg_wait_max": 10.0,
+    "batch_wait_min": 10.0,
+    "batch_wait_max": 20.0
+}

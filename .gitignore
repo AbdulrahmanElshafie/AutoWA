@@ -16,9 +16,6 @@ __pycache__/
 *.log
 logs/*
 
-# Config files
-config/*
-
 # Assets
 learned_assets/*
 pareto_errors/*
