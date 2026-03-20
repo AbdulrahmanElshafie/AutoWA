@@ -24,12 +24,17 @@ MESSAGES_FILE = "config/messages.json"
 
 # Default configuration structure to use if config.json is missing or empty
 default_config = {
-    "permits_dir": None,
-    "seglat_dir": None,
-    "sheet_file": None,
+    "sheet_file": "",
     "time_profiles": {},
-    "selected_profile": None
-}
+    "doc_dir": "",
+    "fixed_doc_path": "",
+    "browsers": [],
+    "batch_size": 5,
+    "msg_wait_min": 5.0,
+    "msg_wait_max": 10.0,
+    "batch_wait_min": 10.0,
+    "batch_wait_max": 20.0
+    }
 
 @log_function
 def load_config():

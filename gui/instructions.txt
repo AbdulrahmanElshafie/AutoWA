@@ -1,4 +1,4 @@
-Communication System Usage Instructions:
+AutoWA Usage Instructions:
 
 Concepts:
 - Pause => For emergency use only to pause the program. When pressed, the program sends the current permit then saves progress and stops.

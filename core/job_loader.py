@@ -1,6 +1,6 @@
 import csv
 from typing import List
-from .job_model import ContactJob, MessageMode, DocMode, JobStatus
+from .job_model import ContactJob, JobStatus
 
 def load_jobs(csv_path: str) -> List[ContactJob]:
     """
@@ -16,22 +16,9 @@ def load_jobs(csv_path: str) -> List[ContactJob]:
             if not number:
                 continue # Skip completely empty rows
                 
-            raw_msg_mode = row.get("message_mode", "").strip()
-            try:
-                message_mode = MessageMode(raw_msg_mode)
-            except ValueError:
-                message_mode = raw_msg_mode # Keep as string for validator to catch later or handle gracefully
-                
-            raw_doc_mode = row.get("doc_mode", "").strip()
-            try:
-                doc_mode = DocMode(raw_doc_mode)
-            except ValueError:
-                doc_mode = raw_doc_mode
-                
             # Parse optional fields
             contact_name = row.get("contact_name", "").strip() or None
-            message_text = row.get("message_text", "").strip() or None
-            message_key = row.get("message_key", "").strip() or None
+            message = row.get("message", "").strip() or None
             doc_path = row.get("doc_path", "").strip() or None
             
             # Status defaults to pending if missing
@@ -48,11 +35,8 @@ def load_jobs(csv_path: str) -> List[ContactJob]:
             
             job = ContactJob(
                 number=number,
-                message_mode=message_mode,
-                doc_mode=doc_mode,
                 contact_name=contact_name,
-                message_text=message_text,
-                message_key=message_key,
+                message=message,
                 doc_path=doc_path,
                 status=status,
                 status_message=status_message
@@ -69,8 +53,7 @@ def save_jobs(csv_path: str, jobs: List[ContactJob]) -> None:
         return
         
     fieldnames = [
-        "number", "contact_name", "message_mode", "message_text", 
-        "message_key", "doc_mode", "doc_path", "status", "status_message"
+        "number", "contact_name", "message", "doc_path", "status", "status_message"
     ]
     
     with open(csv_path, mode="w", encoding="utf-8-sig", newline="") as f:

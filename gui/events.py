@@ -58,7 +58,6 @@ def handle_events(event, values, window):
     global running
 
     if event == "-CONFIRM_PATHS-":
-        config["doc_dir"] = values["-DOC_DIR-"]
         config["fixed_doc_path"] = values["-FIXED_DOC_IN-"]
         config["sheet_file"] = values["-SHEET-"]
         config["browsers"] = values["-BROWSERS-"]
@@ -271,6 +270,14 @@ def handle_events(event, values, window):
         cur_t = values["-SEL_MSG_TEMPLATE-"]
         if cur_t in messages:
             window["-SEL_VARIANT-"].update(values=messages[cur_t]["variants"])
+            
+    elif event == "-SEL_VARIANT-":
+        if values["-SEL_VARIANT-"]:
+            window["-CHK_RANDOM_VAR-"].update(value=False)
+            
+    elif event == "-CHK_RANDOM_VAR-":
+        if values["-CHK_RANDOM_VAR-"]:
+            window["-SEL_VARIANT-"].update(value="")
 
     # --- Execute sending msgs and its controls ---
     elif event == "-EXECUTE-":

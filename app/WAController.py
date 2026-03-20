@@ -62,7 +62,7 @@ class WAController:
         # "Brave": ["Zoom", "Reset Zoom", "Maximise Tab"],
         # "Opera": ["Zoom", "Reset Zoom", "Maximise Tab"],
     }
-    controller = None
+    # controller = None
 
     def __init__(self, profile, browser="Default Browser"):
         """
@@ -220,7 +220,7 @@ class WAController:
                 # Find the name box 
                 self.controller.find_click(self.base_path + "Name", 0.9)
                 # Type the name for the contact
-                self.controller.type(contact_name)
+                self.controller.copy_paste(contact_name)
                 # Save the contact 
                 self.controller.find_click(self.base_path + "Save Contact")
                 return True, "Number added"
@@ -276,7 +276,7 @@ class WAController:
         try:
             # Attempt to add/search for contact
             # We pass an empty name as contact naming may not be needed for direct send from core
-            success, _ = self.add_contact(number, contact_name)
+            success, msg = self.add_contact(number, contact_name)
             if not success:
                 return False, "whatsapp_not_detected"
 
@@ -296,6 +296,7 @@ class WAController:
                 
                 self.controller.find_click(self.base_path + "Add Doc", 0.9)
                 self.controller.find_click(self.base_path + "Doc")
+                document = document.replace("/", "\\")
                 self.controller.type(document)
                 
                 # Send the document

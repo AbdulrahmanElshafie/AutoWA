@@ -1,7 +1,7 @@
 """
 app_main.py
 
-Main entry point for the WhatsApp Messaging GUI application ("Communication System").
+Main entry point for the WhatsApp Messaging GUI application ("AutoWA").
 
 Responsibilities:
 - Initialize the FreeSimpleGUI window with the layout defined in gui.layout.
@@ -41,7 +41,7 @@ from helpers import run_execution
 enable_console_logging(level=logging.ERROR)
 
 # Initialize the main GUI window
-window = sg.Window("Communication System v1.5.1 Alpha", layout, finalize=True)
+window = sg.Window("AutoWA v2.0.0 Beta", layout, finalize=True)
 
 # Reference for background execution thread
 exec_thread = None  # thread reference

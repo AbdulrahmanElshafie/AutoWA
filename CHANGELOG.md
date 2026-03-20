@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the **WhatsApp Automation System** ("Communication System") will be documented in this file.
+All notable changes to the **WhatsApp Automation System** ("AutoWA") will be documented in this file.
 
 The format is inspired by **Keep a Changelog** and follows semantic versioning.
 

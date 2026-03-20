@@ -28,17 +28,15 @@ Functions:
 import FreeSimpleGUI as sg
 import pandas as pd
 import time
-import random
+from gui.helpers import save_config
 from gui.layout import config
 import os
-try:
-    from core.runner import execute_jobs
-except ImportError:
-    def execute_jobs(csv_path):
-        return {"total": 0, "success": 0, "failed": 0}
+from core.runner import execute_jobs
 import math
 from logger import log_function
 import gui.events as events
+from gui.helpers import load_messages
+import random
 
 @log_function
 def validate_inputs(values):
@@ -99,10 +97,65 @@ def validate_inputs(values):
         sg.popup("Minimum batch wait time must be less than the maximum limit.")
         return False
 
+    # 1. if the msg txt only, make sure the txt box has a value
+    if values.get("-MSG_FIXED-") and not values.get("-FIXED_TXT-", "").strip():
+        sg.popup("Please enter text for the fixed message.")
+        return False
+        
+    # 2. if the msg is a tmp make sure a tmp is used
+    if values.get("-MSG_TEMPLATE-") and not values.get("-SEL_MSG_TEMPLATE-"):
+        sg.popup("Please select a message template.")
+        return False
+        
+    # 3. if a tmp without random then a tmp and a variation must be chosen
+    if values.get("-MSG_TEMPLATE-") and not values.get("-CHK_RANDOM_VAR-") and not values.get("-SEL_VARIANT-"):
+        sg.popup("Please select a template variant or enable random variation.")
+        return False
+        
+    # 4. if const doc is chosen then a path must be provided
+    if values.get("-DOC_FIXED-") and not values.get("-FIXED_DOC_IN-", "").strip():
+        sg.popup("Please specify a document path for the fixed document mode.")
+        return False
+        
+    # 5. if a variable doc is picked then the doc_path must be provided
+    if values.get("-DOC_VAR-"):
+        csv_file = values.get("-SHEET-") or config.get("sheet_file")
+        if csv_file and os.path.exists(csv_file):
+            try:
+                import pandas as pd
+                df = pd.read_csv(csv_file)
+                if "doc_path" not in df.columns:
+                    sg.popup("The CSV file must contain a 'doc_path' column when Variable Document mode is selected.")
+                    return False
+            except Exception:
+                pass
+
+    # 6. no msg without txt or doc, at least one should be chosen
+    if values.get("-MSG_DOC_ONLY-") and values.get("-DOC_NONE-"):
+        sg.popup("You must select either a message to send or a document to send.")
+        return False
+
     return True
 
 @log_function
 def run_execution(values, window):
+    """
+    Main orchestrator for the execution process.
+    Prepares the job data based on GUI selections and passes it to the core execution engine.
+
+    Parameters:
+    - values (dict): GUI input values containing message modes, document settings, etc.
+    - window (sg.Window): The active GUI window for progress updates.
+
+    Logic:
+    1. Validates the selected paths and parses the execution delays.
+    2. Reads the jobs from the input CSV file.
+    3. Resolves the final message content for each row (including template processing and \{contact_name\} substitution).
+    4. Resolves the document paths for each row.
+    5. Strips away temporary/intermediate metadata from the CSV to match the core engine schema.
+    6. Calls the backend execution engine (`execute_jobs`) which maintains the actual process.
+    7. Broadcasts the final completion status back to the PySimpleGUI event loop.
+    """
     excel_file_path = config.get("sheet_file")
     if not excel_file_path or not os.path.exists(excel_file_path):
         sg.popup("Input data file not found.")
@@ -126,47 +179,66 @@ def run_execution(values, window):
         return
 
     result = {}
-    import threading
-    def target():
-        try:
-            result['stats'] = execute_jobs(excel_file_path)
-        except Exception as e:
-            result['error'] = str(e)
 
     try:
+
         df = pd.read_csv(excel_file_path)
         
-        # Override columns based on GUI MessageMode
-        if values.get("-MSG_FIXED-"):
-            df["message_mode"] = "fixed"
-            df["message_text"] = values.get("-FIXED_TXT-", "")
-            df["message_key"] = ""
-        elif values.get("-MSG_TEMPLATE-"):
-            df["message_mode"] = "template"
-            df["message_text"] = ""
-            df["message_key"] = values.get("-SEL_MSG_TEMPLATE-", "")
-        elif values.get("-MSG_DOC_ONLY-"):
-            df["message_mode"] = "doc_only"
-            df["message_text"] = ""
-            df["message_key"] = ""
+        # We need contact_name to exist before replacing strings
+        if "contact_name" not in df.columns:
+            df["contact_name"] = ""
             
-        # Override columns based on GUI DocMode
+        # Resolve Message
+        if values.get("-MSG_FIXED-"):
+            msg_text = values.get("-FIXED_TXT-", "")
+            # Apply {contact_name} to fixed messages as well, for consistency
+            df["message"] = df["contact_name"].apply(
+                lambda name: msg_text.replace("{contact_name}", str(name) if pd.notna(name) else "")
+            )
+        elif values.get("-MSG_TEMPLATE-"):
+            template_key = values.get("-SEL_MSG_TEMPLATE-", "")
+            messages_dict = load_messages()
+            template = messages_dict.get(template_key, {})
+            variants = template.get("variants", [])
+            
+            if not variants:
+                sg.popup(f"No variants found for template '{template_key}'.")
+                events.running = False
+                window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+                return
+                
+            is_random = values.get("-CHK_RANDOM_VAR-", False)
+            selected_variant = values.get("-SEL_VARIANT-", "")
+            
+            def resolve_template_msg(name):
+                if is_random or not selected_variant:
+                    msg = random.choice(variants)
+                else:
+                    msg = selected_variant
+                return msg.replace("{contact_name}", str(name) if pd.notna(name) else "")
+                
+            df["message"] = df["contact_name"].apply(resolve_template_msg)
+            
+        elif values.get("-MSG_DOC_ONLY-"):
+            df["message"] = ""
+            
+        # Resolve Document
         if values.get("-DOC_NONE-"):
-            df["doc_mode"] = "none"
             df["doc_path"] = ""
         elif values.get("-DOC_FIXED-"):
-            df["doc_mode"] = "fixed"
-            df["doc_path"] = "" # handled by fixed_doc_path in config.json
+            fixed_doc = values.get("-FIXED_DOC_IN-", "")
+            df["doc_path"] = fixed_doc
         elif values.get("-DOC_VAR-"):
-            df["doc_mode"] = "variable"
-            # We assume the name/number is appended to the doc_dir logically later, 
-            # but we can set the base info here or just let the resolver handle the building
-            # If doc_path column doesn't exist, we must add it as per schema
             if "doc_path" not in df.columns:
                 df["doc_path"] = ""
                 
+        # Clean up old columns if they exist
+        for col in ["message_mode", "message_text", "message_key", "doc_mode"]:
+            if col in df.columns:
+                df = df.drop(columns=[col])
+                
         # Fill missing schemas required columns
-        for col in ["number", "contact_name", "status", "status_message"]:
+        for col in ["number", "status", "status_message"]:
             if col not in df.columns:
                 df[col] = "" if col != "status" else "pending"
                 
@@ -179,36 +251,17 @@ def run_execution(values, window):
         window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
         return
 
-    window["-PROGRESS-"].update(current_count=0, max=total_rows)
-
     start_time = time.time()
-    t = threading.Thread(target=target, daemon=True)
-    t.start()
-
-    while t.is_alive():
-        if not events.running:
-            break
-            
-        time.sleep(1)
-        try:
-            df = pd.read_csv(excel_file_path)
-            if 'status' in df.columns:
-                processed = len(df[df['status'] != 'pending'])
-                # avoid taking NaN as processed if not correctly stored. We consider success or fail as processed
-            else:
-                processed = 0
-            
-            window["-PROGRESS-"].update(current_count=processed)
-            window["-PROGRESS_TEXT-"].update(f"{processed} / {total_rows}")
-        except:
-            pass
-
-    t.join(timeout=1.0)
+    
+    try:
+        result['stats'] = execute_jobs(excel_file_path, window=window)
+    except Exception as e:
+        result['error'] = str(e)
     
     if 'stats' in result:
         stats = result['stats']
         successfully_sent = stats.get("success", 0)
-        failed_sent = stats.get("failed", 0)
+        failed_sent = stats.get("fail", 0)
         pending_sent = stats.get("total", total_rows) - successfully_sent - failed_sent
         if not events.running and pending_sent > 0:
             status = "PAUSED"

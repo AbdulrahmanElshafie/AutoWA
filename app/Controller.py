@@ -16,7 +16,7 @@ import pyautogui
 from .helpers import TimeConroller
 import time
 import pyperclip
-import json
+from gui.helpers import load_config
 import os
 from logger import log_function
 import numpy as np
@@ -54,8 +54,7 @@ class GuiController:
                 Defaults to 01500816271.
         """
          # Load configuration file containing time profiles
-        with open('config.json', 'r') as f:
-            config = json.load(f)
+        config = load_config()
         
         # Initialize time controller with selected profile
         profile = config['time_profiles'][typing_profile] if typing_profile in config['time_profiles'].keys() else config['time_profiles']["01500816271"]
@@ -112,7 +111,6 @@ class GuiController:
                 break
             entry += 1
             time.sleep(1)
-
         for _ in range(max_attemps):
             for c in candidates:
                 try:

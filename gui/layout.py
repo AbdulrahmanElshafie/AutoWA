@@ -40,8 +40,7 @@ template_keys = list(messages.keys())
 # - Select Excel input file
 # These values are later validated and saved by GUI helpers.
 paths_layout = [
-    # Permits directory selection
-    [sg.Text("Document Folder (if variant):"), sg.Input(config.get("doc_dir") or "", key="-DOC_DIR-"), sg.FolderBrowse("Browse...")],
+    # Paths selection
     [sg.Text("Data File (CSV):"), sg.Input(config.get("sheet_file") or "", key="-SHEET-"), sg.FileBrowse("Browse...", file_types=(("CSV Files", "*.csv"),))],
     # Browsers Selection
     [sg.Text("Browsers:"), sg.Listbox(["Default Browser", "Chrome", "Edge"], default_values=config.get("browsers", ["Default Browser"]), select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE, size=(20, 3), key="-BROWSERS-", enable_events=True)],
@@ -112,7 +111,7 @@ ops_layout = [
         [sg.Text("Select Template:")],
         [sg.Combo(template_keys, key="-SEL_MSG_TEMPLATE-", size=(30, 1), enable_events=True)],
         [sg.Text("Select Variant (or Random):")],
-        [sg.Combo([], key="-SEL_VARIANT-", size=(30, 1)), sg.Checkbox("Random", key="-CHK_RANDOM_VAR-", default=True)]
+        [sg.Combo([], key="-SEL_VARIANT-", size=(30, 1), enable_events=True), sg.Checkbox("Random", key="-CHK_RANDOM_VAR-", default=True, enable_events=True)]
     ], key="-COL_TEMPLATE-", visible=False))],
 
     # Document Mode selection
