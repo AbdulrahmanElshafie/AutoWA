@@ -1,6 +1,6 @@
 # WhatsApp Automation System ("AutoWA")
 
-![App Screenshot Placeholder](AutoWA.png)
+![App](https://github.com/AbdulrahmanElshafie/AutoWA/blob/stage/AutoWA.PNG)
 
 The **AutoWA** is a powerful, professional Python-based desktop tool designed to strictly streamline mass-messaging on WhatsApp Web. Built to maximize productivity, it uses a graphical interface to easily manage contacts, dynamically template messages, and safely automate document attachments with human-like accuracy.
 
