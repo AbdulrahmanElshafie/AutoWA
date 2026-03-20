@@ -1,0 +1,13 @@
+{
+    "M": {
+        "title": "Hello WA",
+        "enabled": true,
+        "variants": [
+            "Hi",
+            "Hello",
+            "Hru",
+            "Yo",
+            "Hey"
+        ]
+    }
+}
