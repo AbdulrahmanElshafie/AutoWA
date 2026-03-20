@@ -28,13 +28,15 @@ Functions:
 import FreeSimpleGUI as sg
 import pandas as pd
 import time
-import random
+from gui.helpers import save_config
 from gui.layout import config
-from app.WAController import WAController
 import os
+from core.runner import execute_jobs
 import math
 from logger import log_function
 import gui.events as events
+from gui.helpers import load_messages
+import random
 
 @log_function
 def validate_inputs(values):
@@ -55,14 +57,14 @@ def validate_inputs(values):
     - Shows popups for errors and returns False on validation failure.
     """
     required_fields = {
-        "-BATCH_SIZE-": "حجم الدفعة",
-        "-MSG_WAIT_MIN-": "انتظار الرسالة (ث)",
-        "-MSG_WAIT_MAX-": "انتظار الرسالة (ث)",
-        "-BATCH_WAIT_MIN-": "انتظار الدفعة (ث)",
-        "-BATCH_WAIT_MAX-": "انتظار الدفعة (ث)",
-        "-PROFILE-": "ملف التوقيت",
+        "-BATCH_SIZE-": "Batch Size",
+        "-MSG_WAIT_MIN-": "Msg Wait (sec)",
+        "-MSG_WAIT_MAX-": "Msg Wait (sec)",
+        "-BATCH_WAIT_MIN-": "Batch Wait (min)",
+        "-BATCH_WAIT_MAX-": "Batch Wait (min)",
+        "-PROFILE-": "Timing Profile",
     }
-    error_msg = "الرجاء ملء الحقل: "
+    error_msg = "Please fill the field: "
     valid = True
     
     # Check the existence of of values for the required fields
@@ -83,236 +85,197 @@ def validate_inputs(values):
         float(values["-BATCH_WAIT_MIN-"])
         float(values["-BATCH_WAIT_MAX-"])
     except ValueError:
-        sg.popup("الرجاء إدخال أرقام صالحة في حقول الانتظار وحجم الدفعة.")
+        sg.popup("Please enter valid numeric values in time wait and batch fields.")
         return False
     
     # Ensure minimums are less than maximums
     if float(values["-MSG_WAIT_MIN-"]) >= float(values["-MSG_WAIT_MAX-"]):
-        sg.popup("الحد الأدني لحقل انتظار الرسائل يجب أن يكون أقل من الحد الأقصي")
+        sg.popup("Minimum message wait time must be less than the maximum limit.")
         return False
 
     if float(values["-BATCH_WAIT_MIN-"]) >= float(values["-BATCH_WAIT_MAX-"]):
-        sg.popup("الحد الأدني لحقل انتظار الدفعة يجب أن يكون أقل من الحد الأقصي")
+        sg.popup("Minimum batch wait time must be less than the maximum limit.")
+        return False
+
+    # 1. if the msg txt only, make sure the txt box has a value
+    if values.get("-MSG_FIXED-") and not values.get("-FIXED_TXT-", "").strip():
+        sg.popup("Please enter text for the fixed message.")
+        return False
+        
+    # 2. if the msg is a tmp make sure a tmp is used
+    if values.get("-MSG_TEMPLATE-") and not values.get("-SEL_MSG_TEMPLATE-"):
+        sg.popup("Please select a message template.")
+        return False
+        
+    # 3. if a tmp without random then a tmp and a variation must be chosen
+    if values.get("-MSG_TEMPLATE-") and not values.get("-CHK_RANDOM_VAR-") and not values.get("-SEL_VARIANT-"):
+        sg.popup("Please select a template variant or enable random variation.")
+        return False
+        
+    # 4. if const doc is chosen then a path must be provided
+    if values.get("-DOC_FIXED-") and not values.get("-FIXED_DOC_IN-", "").strip():
+        sg.popup("Please specify a document path for the fixed document mode.")
+        return False
+        
+    # 5. if a variable doc is picked then the doc_path must be provided
+    if values.get("-DOC_VAR-"):
+        csv_file = values.get("-SHEET-") or config.get("sheet_file")
+        if csv_file and os.path.exists(csv_file):
+            try:
+                import pandas as pd
+                df = pd.read_csv(csv_file)
+                if "doc_path" not in df.columns:
+                    sg.popup("The CSV file must contain a 'doc_path' column when Variable Document mode is selected.")
+                    return False
+            except Exception:
+                pass
+
+    # 6. no msg without txt or doc, at least one should be chosen
+    if values.get("-MSG_DOC_ONLY-") and values.get("-DOC_NONE-"):
+        sg.popup("You must select either a message to send or a document to send.")
         return False
 
     return True
 
 @log_function
-def save_excel(df):
+def run_execution(values, window):
     """
-    Save the given DataFrame to an Excel file on the desktop.
+    Main orchestrator for the execution process.
+    Prepares the job data based on GUI selections and passes it to the core execution engine.
 
     Parameters:
-    - df (pd.DataFrame): The DataFrame containing execution results.
+    - values (dict): GUI input values containing message modes, document settings, etc.
+    - window (sg.Window): The active GUI window for progress updates.
 
     Logic:
-    - Attempts to save to a primary filename.
-    - If it fails (e.g., file in use), saves to a secondary filename.
-    - Columns are renamed for Arabic headers. 
-    - Use openpyxl engine to handle Arabic text in the excel file
-    """ 
-    try:
-        df.to_excel('C:\\Users\\PC\\Desktop\\pdfs.xlsx', index=False, engine="openpyxl", 
-                header=['رقم الهاتف', 'اسم الضابط', 'الرقم القومي للضابط / الرسالة', 'الحالة'])
-    except Exception as e:
-        df.to_excel('C:\\Users\\PC\\Desktop\\pdfs res.xlsx', index=False, engine="openpyxl", 
-                header=['رقم الهاتف', 'اسم الضابط', 'الرقم القومي للضابط / الرسالة', 'الحالة'])
-
-def calculate_stats(df):
-    successfully_sent = len(df[df['الحالة'] == "تم إرسال المحتوى بنجاح"])
-    pending_sent = len(df[df['الحالة'].isna()])
-    failed_sent = len(df[(df['الحالة'] != "تم إرسال المحتوى بنجاح") & (~df['الحالة'].isna())])
-
-    return successfully_sent, pending_sent, failed_sent
-
-@log_function
-def run_execution(values, window):  
+    1. Validates the selected paths and parses the execution delays.
+    2. Reads the jobs from the input CSV file.
+    3. Resolves the final message content for each row (including template processing and \{contact_name\} substitution).
+    4. Resolves the document paths for each row.
+    5. Strips away temporary/intermediate metadata from the CSV to match the core engine schema.
+    6. Calls the backend execution engine (`execute_jobs`) which maintains the actual process.
+    7. Broadcasts the final completion status back to the PySimpleGUI event loop.
     """
-    Main execution function to process a list of officers/messages from Excel,
-    interact with WAController, and update the GUI progress.
-
-    Parameters:
-    - values (dict): GUI input values.
-    - window (sg.Window): The active GUI window to update progress.
-
-    Returns:
-    - None: Updates the GUI and writes results to Excel directly.
-
-    Logic:
-    1. Validates and loads the Excel input file.
-    2. Determines the document type to send based on GUI selections.
-    3. Initializes WAController and sets batch and round parameters.
-    4. Iterates through the DataFrame:
-       - Skips rows that have already been processed.
-       - Opens WA accounts as needed.
-       - Sends messages or documents.
-       - Updates the "الحالة" column with results.
-       - Updates progress bar, estimated remaining time, and rounds left.
-       - Pauses or waits based on message and batch timing parameters.
-       - Handles exceptions and ensures the WAController is reset.
-    5. Saves final results to Excel and updates GUI buttons and events.
-
-    Notes:
-    - Uses randomization in batch size and wait times to mimic human behavior.
-    - Supports pausing/stopping through the global `events.running` flag.
-    - Handles GUI closure events safely.
-    """  
-    # Check the existence of the input files
     excel_file_path = config.get("sheet_file")
     if not excel_file_path or not os.path.exists(excel_file_path):
-        sg.popup("ملف الإدخال غير موجود")
+        sg.popup("Input data file not found.")
         events.running = False
-        window.write_event_value("-THREAD DONE-", ("ERROR", None, None, None, None))
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
         return
-    
-    # Read the input file
-    df = pd.read_excel(excel_file_path, engine="openpyxl")
-    
-    # Read the kind of content to be sent (permit, seglat, msg)
-    if values["-TYPE_PERMIT-"]:
-        doc_type = "permit"
-    elif values["-TYPE_SEGLAT-"]:
-        doc_type = "seglat"
-    elif values["-TYPE_MSG-"]:
-        doc_type = "msg"
-    else:
-        doc_type = None
 
-    # Read the typing, waiting profile
-    profile_name = values["-PROFILE-"] 
-    # Read the account batch size (number of msgs sent per account)
-    batch_avg_size = int(values["-BATCH_SIZE-"]) 
-    total_rows = len(df) # total number of rows in the input sheet
-    current_count = 0 # current progress
-    round_size = int(batch_avg_size) * 2 # round size for the two accounts
-    rounds_left = math.ceil(total_rows / round_size) # the rounds left to send all msgs
+    # Pass GUI execution parameters to the backend
+    try:
+        config["batch_size"] = int(values.get("-BATCH_SIZE-", 5))
+        config["msg_wait_min"] = float(values.get("-MSG_WAIT_MIN-", 5))
+        config["msg_wait_max"] = float(values.get("-MSG_WAIT_MAX-", 10))
+        config["batch_wait_min"] = float(values.get("-BATCH_WAIT_MIN-", 10))
+        config["batch_wait_max"] = float(values.get("-BATCH_WAIT_MAX-", 20))
+        config["browsers"] = values.get("-BROWSERS-", ["Default Browser"])
+        save_config(config)
+    except Exception as e:
+        sg.popup(f"Failed to save execution configuration: {str(e)}")
+        events.running = False
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+        return
 
-    # Initialize GUI progress indicators
-    window["-PROGRESS-"].update(current_count=0, max=total_rows)
-    window["-PROGRESS_TEXT-"].update(f"0 / {total_rows}")
-    window["-ROUNDS_LEFT-"].update(str(rounds_left))
+    result = {}
 
-    # randomize the number of msgs sent
-    e = random.randint(max(1, batch_avg_size // 2), batch_avg_size + 2)
-    i = 0 # track the batch progress
-    wa_account = 1 # wa account/browser to use initially
-    controller = WAController(profile_name) # WA controller 
+    try:
+
+        df = pd.read_csv(excel_file_path)
+        
+        # We need contact_name to exist before replacing strings
+        if "contact_name" not in df.columns:
+            df["contact_name"] = ""
+            
+        # Resolve Message
+        if values.get("-MSG_FIXED-"):
+            msg_text = values.get("-FIXED_TXT-", "")
+            # Apply {contact_name} to fixed messages as well, for consistency
+            df["message"] = df["contact_name"].apply(
+                lambda name: msg_text.replace("{contact_name}", str(name) if pd.notna(name) else "")
+            )
+        elif values.get("-MSG_TEMPLATE-"):
+            template_key = values.get("-SEL_MSG_TEMPLATE-", "")
+            messages_dict = load_messages()
+            template = messages_dict.get(template_key, {})
+            variants = template.get("variants", [])
+            
+            if not variants:
+                sg.popup(f"No variants found for template '{template_key}'.")
+                events.running = False
+                window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+                return
+                
+            is_random = values.get("-CHK_RANDOM_VAR-", False)
+            selected_variant = values.get("-SEL_VARIANT-", "")
+            
+            def resolve_template_msg(name):
+                if is_random or not selected_variant:
+                    msg = random.choice(variants)
+                else:
+                    msg = selected_variant
+                return msg.replace("{contact_name}", str(name) if pd.notna(name) else "")
+                
+            df["message"] = df["contact_name"].apply(resolve_template_msg)
+            
+        elif values.get("-MSG_DOC_ONLY-"):
+            df["message"] = ""
+            
+        # Resolve Document
+        if values.get("-DOC_NONE-"):
+            df["doc_path"] = ""
+        elif values.get("-DOC_FIXED-"):
+            fixed_doc = values.get("-FIXED_DOC_IN-", "")
+            df["doc_path"] = fixed_doc
+        elif values.get("-DOC_VAR-"):
+            if "doc_path" not in df.columns:
+                df["doc_path"] = ""
+                
+        # Clean up old columns if they exist
+        for col in ["message_mode", "message_text", "message_key", "doc_mode"]:
+            if col in df.columns:
+                df = df.drop(columns=[col])
+                
+        # Fill missing schemas required columns
+        for col in ["number", "status", "status_message"]:
+            if col not in df.columns:
+                df[col] = "" if col != "status" else "pending"
+                
+        # Re-save the overriden definitions back so the engine reads them!
+        df.to_csv(excel_file_path, index=False)
+        total_rows = len(df)
+    except Exception as e:
+        sg.popup(f"An error occurred loading job execution settings: {str(e)}")
+        events.running = False
+        window.write_event_value("-THREAD DONE-", ("ERROR", 0, 0, 0, None))
+        return
 
     start_time = time.time()
-
-    controller.controller.ensure_device_lang_is_en()
-    for idx, row in df.iterrows():
-        msg = None
-        res = None
-        try:
-            if not events.running:  # Stop if global flag is False (Pause is clicked)
-                save_excel(df)
-                break
-
-             # Skip rows already attempted to send 
-            if not pd.isna(row['الحالة']):
-                current_count += 1
-                continue
-
-            # Extract data from row
-            phone_number = str(int(row.iloc[0])).removeprefix("20")
-            name = str(row.iloc[1]) or " "
-            officer_id_msg = str(int(row.iloc[2])) if not isinstance(row.iloc[2], str) else row.iloc[2]
-            
-            # Open WA account for batch
-            if (not i) or (i % (batch_avg_size + e) == 0):
-                controller.open_wa(wa_account)
-            
-            # Send content via WAController
-            contact_added = False
-            is_egyptian = phone_number.startswith(("10", "11", "12", "15"))
-            try:
-                # Add the officer contact or find it on WA
-                res, msg = controller.add_contact(phone_number, officer_id_msg)
-                # If the contact was found on WA proceed
-                if res:
-                    contact_added = True
-                    # Send the msg to the officer
-                    res, msg = controller.send_content(officer_id_msg, name, doc_type)
-                    # If the numebr is not a foriegn number then it's added in the contacts
-            finally:
-                # then delete it after sending the msg 
-                if contact_added and is_egyptian:
-                    controller.delete_contact()
-
-            # Reset the WA UI by clicking on the msgs icon
-            # And close the currently opened chat
-            controller.reset_wa()
-            controller.close_chat()
-            # Update the status of the current row to be saved later 
-            # df.loc[idx, "الحالة"] = msg
-            if msg is not None:
-                df.loc[idx, "الحالة"] = msg
-            else:
-                df.loc[idx, "الحالة"] = "لم يتم التنفيذ"
-
-            # --- Update GUI progress ---
-            current_count = idx + 1
-            elapsed = time.time() - start_time
-            avg_per_msg = elapsed / current_count
-            remaining_time_sec = avg_per_msg * (total_rows - current_count)
-            rounds_left = math.ceil((total_rows - current_count) / round_size)
-            est_text = f"{remaining_time_sec/60:.1f} دقيقة"
-            
-            window["-PROGRESS-"].update(current_count=current_count)
-            window["-PROGRESS_TEXT-"].update(f"{current_count} / {total_rows}")
-            window["-EST_TIME-"].update(est_text)
-            window["-ROUNDS_LEFT-"].update(str(rounds_left))
-
-            # Handle batch completion and wait
-            i += 1
-            if i >= (batch_avg_size + e):
-                if wa_account == len(controller.accounts):
-                    batch_wait = random.uniform(
-                        float(values["-BATCH_WAIT_MIN-"]) * 60,
-                        float(values["-BATCH_WAIT_MAX-"]) * 60
-                    )
-                    save_excel(df)
-                    successfully_sent, pending_sent, failed_sent = calculate_stats(df)
-                    window.write_event_value("-BATCH BREAK-", (successfully_sent, pending_sent, failed_sent, batch_wait))
-                    time.sleep(batch_wait)
-
-                i = 0
-                e = random.randint(max(1, batch_avg_size // 2), batch_avg_size + 2)
-                wa_account = wa_account % len(controller.accounts) + 1
-            else:
-                # Random wait between messages
-                msg_wait = random.uniform(
-                    float(values["-MSG_WAIT_MIN-"]),
-                    float(values["-MSG_WAIT_MAX-"])
-                )
-                time.sleep(msg_wait)
-
-             # Allow GUI to refresh and check for closure
-            event, _ = window.read(timeout=0)
-            if event == sg.WIN_CLOSED or event == "-CANCEL-":
-                save_excel(df)
-                break
-                
     
-        except Exception as exception:
-            # Handle unexpected failures
-            df.loc[idx, "الحالة"] = f"فشل غير متوقع - {str(exception)}"
-            save_excel(df)
-            # controller.close_wa()
-            # controller.open_wa(wa_account)
+    try:
+        result['stats'] = execute_jobs(excel_file_path, window=window)
+    except Exception as e:
+        result['error'] = str(e)
+    
+    if 'stats' in result:
+        stats = result['stats']
+        successfully_sent = stats.get("success", 0)
+        failed_sent = stats.get("fail", 0)
+        pending_sent = stats.get("total", total_rows) - successfully_sent - failed_sent
+        if not events.running and pending_sent > 0:
+            status = "PAUSED"
+        else:
+            status = "DONE"
+    else:
+        successfully_sent = failed_sent = pending_sent = 0
+        status = "ERROR"
 
-
-    # Finalize execution
     events.running = False
     window["-PAUSE-"].update(disabled=True)
     window["-EXECUTE-"].update(disabled=False)
-    save_excel(df)
-    successfully_sent, pending_sent, failed_sent = calculate_stats(df)
-    if current_count == total_rows:
-        window.write_event_value("-THREAD DONE-", ("DONE", successfully_sent, pending_sent, failed_sent, None))
-    else:
-        window.write_event_value("-THREAD DONE-", ("PAUSED", successfully_sent, pending_sent, failed_sent, None))
+    
+    window.write_event_value("-THREAD DONE-", (status, successfully_sent, pending_sent, failed_sent, None))
 
 
 @log_function

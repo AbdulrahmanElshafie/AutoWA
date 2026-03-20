@@ -1,10 +1,9 @@
-
 # WhatsApp Automation GUI
 
 ## Summary
-This GUI application provides an interface to automate message sending, permits handling, and data entry tasks using pre-defined typing and timing profiles. It is designed to help users manage batch operations efficiently while simulating human-like typing behavior.  
+This GUI application provides an interface to automate message sending and data entry tasks using pre-defined typing and timing profiles. It is designed to help users manage batch operations efficiently while simulating human-like typing behavior.
 
-The application uses **FreeSimpleGUI** for the GUI, **pandas** for Excel file management, and supports user-defined timing profiles for flexible automation.
+The application uses **FreeSimpleGUI** for the GUI, **pandas** for CSV file management, and supports user-defined timing profiles for flexible automation.
 
 ---
 
@@ -12,9 +11,8 @@ The application uses **FreeSimpleGUI** for the GUI, **pandas** for Excel file ma
 
 ### 1. Path Configuration
 - Select directories for:
-  - Permits (`permits_dir`)
-  - Seglat files (`seglat_dir`)
-- Choose an Excel input file (`sheet_file`)
+  - Documents folder (`doc_dir`)
+- Choose a CSV input file (`sheet_file`)
 - Save paths for future sessions.
 - Validates the existence of selected files and folders.
 
@@ -43,7 +41,7 @@ The application uses **FreeSimpleGUI** for the GUI, **pandas** for Excel file ma
 ### 4. Instructions and Usage Notes
 - Display detailed usage instructions via a popup.
 - Important static notes to guide correct usage and prevent errors:
-  - Close Excel before execution
+  - Close CSV before execution
   - Do not close the application during execution
   - Avoid mouse interference during automation
   - Use the dark mode for best results
@@ -57,13 +55,13 @@ gui/
     ├───instructions.txt
     ├───layout.py
 
-
 ### `layout.py`
 - Defines the GUI layout using **FreeSimpleGUI**.
 - Composed of logical sections (frames):
   - Paths
   - Typing/Timing Profiles
-  - Execution & Operations
+  - Operations & Execution
+  - Template Manager
   - Important Notes
 - Preloads previously saved configuration values.
 - **Does not** contain logic or event handling.
@@ -96,9 +94,7 @@ gui/
 - Python 3.8+
 - [FreeSimpleGUI](https://pypi.org/project/FreeSimpleGUI/)
 - [pandas](https://pypi.org/project/pandas/)
-- [openpyxl](https://pypi.org/project/openpyxl/) (for Excel file reading/writing)
-- logger module (for function logging, optional but recommended)
-- Existing Excel files and directories for permits and seglat
+- Existing CSV files and directories for documents
 
 ---
 
@@ -106,10 +102,9 @@ gui/
 
 1. **Set Paths**
    - Open the application and select:
-     - Permits directory
-     - Seglat directory
-     - Excel input file
-   - Click **"تأكيد المسارات"** to save paths.
+     - Documents directory
+     - Data file (CSV)
+   - Click **"Confirm Paths"** to save paths.
 
 2. **Manage Typing Profiles**
    - Select a profile to preview timing settings.
@@ -123,16 +118,16 @@ gui/
      - Messages per round
      - Remaining rounds
      - Estimated time
-   - Click **تنفيذ/استكمال** to start.
-   - Use **إيقاف مؤقت** to pause, **إلغاء** to cancel, **إعادة التنفيذ** to restart.
+   - Click **Execute / Resume** to start.
+   - Use **Pause** to pause, **Cancel** to cancel, **Restart** to restart.
 
 4. **Follow Instructions**
-   - Access detailed instructions via **التعليمات** button.
+   - Access detailed instructions via **Instructions** button.
    - Follow important static notes for smooth operation.
 
 ---
 
 ## Notes
-- Ensure Excel input files are closed before execution.
+- Ensure CSV input files are closed before execution.
 - Avoid interacting with the GUI or moving the mouse during active automation.
-- Use the dark mode in WA for optimal visibility.
+- Use the dark mode in WhatsApp for optimal visibility.

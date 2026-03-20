@@ -10,9 +10,13 @@
 2. Improve the continue progress sheet
 3. Save last used wa account and switch regardless if stops 
 
-## Majot Features
+## Major Features
 1. System health and error logs stats monitoring and management dashboard & error alarm system 
 2. Icon capture & management => In Progress
+3. Sending locations, emojis, and richer WhatsApp interactions
+4. Turning the system into a WhatsApp customer support agent
+5. Adding support for foreign phone numbers (non-Egyptian) instead of directly texting them
+6. Add support for additional languages and light mode styling (by adding appropriate assets)
 
 ## Major Changes
 

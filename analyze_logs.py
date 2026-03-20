@@ -17,7 +17,7 @@ def normalize_error(msg: str) -> str:
     Normalize errors so similar ones are grouped together
     """
     if "ImageNotFoundException" in msg:
-        icon = re.findall(r"ايكونة: (.+)", msg)
+        icon = re.findall(r"icon: (.+)", msg, re.IGNORECASE)
         return f"ImageNotFoundException::{icon[0] if icon else 'UNKNOWN'}"
 
     if "UnboundLocalError" in msg:
