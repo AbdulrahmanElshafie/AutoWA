@@ -41,7 +41,7 @@ from helpers import run_execution
 enable_console_logging(level=logging.ERROR)
 
 # Initialize the main GUI window
-window = sg.Window("AutoWA v2.0.0 Beta", layout, finalize=True)
+window = sg.Window("AutoWA v2.1.0 Beta", layout, finalize=True)
 
 # Reference for background execution thread
 exec_thread = None  # thread reference

@@ -6,8 +6,18 @@ The format is inspired by **Keep a Changelog** and follows semantic versioning.
 
 ---
 
-# [v2.0.0] — Core System Refactor (Unreleased)
+# [v2.1.0 Beta] — Monitoring & Modularization (Unreleased)
 
+## ✨ Major Features
+
+* Added **Analytics Module** for structured tracking of session-based throughput metrics (all, current, and last sessions)
+* Added **Health Monitoring System** to isolate minor error detection and comprehensively display system health status
+* Introduced **JSONL Structured Logging** into the core engine for enhanced diagnostic monitoring and automated log analysis
+* Introduced **App Modularization**, drastically decoupling the GUI into targeted components (analytics, monitoring, recovery event handlers) away from the main application entry point
+
+---
+
+# [v2.0.0] — Core System Refactor
 ## 🚨 Breaking Changes
 
 * Replaced Excel-based workflow with **CSV-based job system**

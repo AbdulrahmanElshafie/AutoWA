@@ -8,9 +8,10 @@ import random
 from .job_loader import load_jobs, save_jobs
 from .validator import validate_jobs
 from .job_model import JobStatus
-from logger import log_function
+from logger import log_function, log_execution
 from app.WAController import WAController
 import FreeSimpleGUI as sg
+import uuid
 
 def sleep_with_events(duration: float, window=None) -> bool:
     """Sleep for duration while keeping GUI responsive. Returns True if interrupted."""
@@ -67,7 +68,9 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
     batch_wait_max = float(config.get("batch_wait_max", 20)) * 60
 
     controllers = [WAController(profile, browser=b) for b in browsers]
-    
+    session_id = str(uuid.uuid4())
+    msgs_in_current_batch = 0
+
     stats = {
         "total": len(jobs),
         "success": 0,
@@ -76,8 +79,20 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
 
     current_controller_idx = 0
     controller = controllers[current_controller_idx]  # Select the first account
-    controller.open_wa()                              # Launch UI/Browser for the account
-    msgs_in_current_batch = 0
+    
+    try:
+        controller.open_wa()                              # Launch UI/Browser for the account
+    except Exception as e:
+        error_str = str(e).upper()
+        critical_type = "SYSTEM_HALT"
+        if "DISCONNECTED" in error_str: critical_type = "DISCONNECTED"
+        elif "BROWSER_CRASH" in error_str: critical_type = "BROWSER_CRASH"
+        elif "FATAL_ERROR" in error_str: critical_type = "FATAL_ERROR"
+        
+        log_execution("open_browser", "failed", error_type=critical_type, session_id=session_id)
+        return stats
+        
+
     
     # Initialize the GUI progress bar if a window is provided
     if window:
@@ -102,31 +117,55 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
                 events.running = False
                 break
                 
-        # Skip jobs that previously failed during an earlier run
-        if job.status == JobStatus.FAIL:
+        # Skip jobs that previously failed or succeeded during an earlier run
+        if job.status == JobStatus.FAIL or job.status == JobStatus.SUCCESS:
             stats["fail"] += 1
             continue
             
         try:
+            start_t = time.time()
             # Send using WAController integration
             success, err_msg = controller.send(job.number, job.contact_name, job.message, job.doc_path)
+            duration = time.time() - start_t
             
             if success:
                 job.status = JobStatus.SUCCESS
                 stats["success"] += 1
+                log_execution("send_message", "success", duration, session_id=session_id)
             else:
                 job.status = JobStatus.FAIL
                 job.status_message = err_msg
                 stats["fail"] += 1
                 
+                mapped_err = err_msg
+                err_upper = err_msg.upper()
+                for c_type in ["DISCONNECTED", "BROWSER_CRASH", "FATAL_ERROR", "SYSTEM_HALT"]:
+                    if c_type in err_upper:
+                        mapped_err = c_type
+                        break
+                        
+                log_execution("send_message", "failed", duration, error_type=mapped_err, session_id=session_id)
+                
         except ValueError as e:
+            duration = time.time() - start_t
             job.status = JobStatus.FAIL
             job.status_message = str(e)
             stats["fail"] += 1
+            log_execution("send_message", "failed", duration, error_type="ValueError", session_id=session_id)
         except Exception as e:
+            duration = time.time() - start_t
             job.status = JobStatus.FAIL
             job.status_message = f"unexpected_error: {str(e)}"
             stats["fail"] += 1
+            
+            mapped_err = type(e).__name__
+            err_upper = str(e).upper()
+            for c_type in ["DISCONNECTED", "BROWSER_CRASH", "FATAL_ERROR", "SYSTEM_HALT"]:
+                if c_type in err_upper:
+                    mapped_err = c_type
+                    break
+                    
+            log_execution("send_message", "failed", duration, error_type=mapped_err, session_id=session_id)
 
         # Determine wait intervals and account swapping logic
         # We trigger delays between tasks unless this is the very last job.
@@ -143,7 +182,18 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
                 
                 # Re-assign the controller to the next account and open its tab
                 controller = controllers[next_idx]
-                controller.open_wa()
+                try:
+                    controller.open_wa()
+                except Exception as e:
+                    error_str = str(e).upper()
+                    critical_type = "SYSTEM_HALT"
+                    if "DISCONNECTED" in error_str: critical_type = "DISCONNECTED"
+                    elif "BROWSER_CRASH" in error_str: critical_type = "BROWSER_CRASH"
+                    elif "FATAL_ERROR" in error_str: critical_type = "FATAL_ERROR"
+                    
+                    log_execution("switch_browser", "failed", error_type=critical_type, session_id=session_id)
+                    break
+                    
                 
                 # Reset tracking so the next account gets its full batch
                 msgs_in_current_batch = 0
