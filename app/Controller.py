@@ -22,7 +22,7 @@ from logger import log_function
 import numpy as np
 import ctypes 
 import locale
-from .icon_manager import IconManager
+from icons_management.logic import save_failure_snapshot
 
 class GuiController:
     """
@@ -39,7 +39,6 @@ class GuiController:
             the selected time profile.
     """
     time_controller = None
-    IconManagerController = IconManager()
 
     def __init__(self, typing_profile='01500816271'):
         """
@@ -138,9 +137,8 @@ class GuiController:
         # Raise error if image was not found
         if raise_on_fail:
             # If raise is provided then icon is important and has to be saved otherwise it's not
-            screenshot = self.IconManagerController.capture_failure(os.path.basename(obj))
-            # self.IconManagerController.learn_icon(obj, screenshot)
-            raise pyautogui.ImageNotFoundException(f'Unable to find icon: {os.path.basename(obj)}')
+            screenshot = save_failure_snapshot(os.path.basename(obj))
+            raise pyautogui.ImageNotFoundException(f'FATAL_ERROR: Unable to find icon: {os.path.basename(obj)}')
 
     @log_function   
     def type(self, txt):
@@ -263,7 +261,7 @@ class GuiController:
             time.sleep(3)
 
 
-        screenshot = self.IconManagerController.capture_failure(os.path.basename(condition_img))
+        screenshot = save_failure_snapshot(os.path.basename(condition_img))
         # self.IconManagerController.learn_icon(condition_img, screenshot)
         return False
 

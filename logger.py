@@ -3,6 +3,8 @@ import os
 import traceback
 import functools
 import time
+import json
+from datetime import datetime
 
 # --------------------------------------------------
 # Setup logging folder
@@ -204,3 +206,18 @@ def log_function(func):
             raise
 
     return wrapper
+
+def log_execution(action: str, status: str, duration: float = 0.0, error_type: str = None, session_id: str = None):
+    """
+    Log an entry to the JSONL execution log file.
+    """
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "action": action,
+        "status": status,
+        "duration": duration,
+        "error_type": error_type,
+        "session_id": session_id
+    }
+    with open(os.path.join(LOG_DIR, "execution_log.jsonl"), "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")

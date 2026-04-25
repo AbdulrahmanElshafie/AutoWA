@@ -25,9 +25,16 @@ import os
 from .layout import config
 from .helpers import *
 import math
+from analytics.analyzer import get_full_analytics, load_logs
+from monitoring.health import get_system_health
+from icons_management.logic import list_icons, list_icon_images, delete_icon_image, list_pending_recoveries, delete_recovery, save_recovery_to_icon
+import base64
+from PIL import Image
+import io
 
 # Global flag to indicate if the sending process is currently running
 running = False  
+crop_state = {'clicks': [], 'rect_id': None, 'img_w': 0, 'img_h': 0, 'path': None}
 
 def handle_events(event, values, window):
     """
@@ -329,6 +336,185 @@ def handle_events(event, values, window):
                 # If the input file is not found 
                 sg.popup("Input data file not found.")
                 return None
+
+    # --- Integration Handlers for Tracking Systems ---
+    if event == '-REFRESH_ANALYTICS-':
+        stats = get_full_analytics("logs/execution_log.jsonl")
+        sr = stats.get('success_rate', 0)
+        total = stats.get('total', 0)
+        window['-TOTAL_ACTIONS-'].update(total)
+        window['-FAILURES-'].update(stats.get('failures', 0))
+        window['-TOTAL_MESSAGES-'].update(stats.get('total_messages', 0))
+        window['-SUCCESS_RATE-'].update(f"{sr}%")
+        error_rate = 0.0 if total == 0 else round(100.0 - float(sr), 2)
+        window['-ERROR_RATE-'].update(f"{error_rate}%")
+        window['-AVG_DURATION-'].update(f"{stats.get('avg_duration', 0)}s")
+        
+        throughput_data = stats.get('throughput', {})
+        if isinstance(throughput_data, dict):
+            window['-THROUGHPUT_ALL-'].update(f"All Time: {throughput_data.get('avg_all', 0)} msg/m")
+            window['-THROUGHPUT_CUR-'].update(f"Current Session: {throughput_data.get('avg_current_session', 0)} msg/m")
+            window['-THROUGHPUT_LAST-'].update(f"Last Session: {throughput_data.get('avg_last_session', 0)} msg/m")
+        else:
+            window['-THROUGHPUT_ALL-'].update(f"All Time: {throughput_data} msg/m")
+            window['-THROUGHPUT_CUR-'].update("Current Session: 0.0 msg/m")
+            window['-THROUGHPUT_LAST-'].update("Last Session: 0.0 msg/m")
+
+        return None
+    
+    elif event == '-CHECK_HEALTH-':
+        logs = load_logs("logs/execution_log.jsonl")
+        health = get_system_health(logs)
+        score = health['score']
+        status = health['status']
+        color = health['color'] 
+        window['-HEALTH_STATUS-'].update(status, text_color=color)
+        window['-HEALTH_SCORE-'].update(str(score))
+        alerts = [f"CRITICAL: {e['type']}" for e in health['critical_issues']] + \
+                 [f"REPEATED: {e['type']}" for e in health['repeated_issues']]
+        window['-ALERTS-'].update(alerts)
+        return None
+
+    elif event == '-REFRESH_ICONS-':
+        icons = list_icons()
+        window['-ICON_DIR_LIST-'].update(values=icons)
+        window.write_event_value('-RELOAD_RECOVERY_QUEUE-', None)
+        return None
+
+    elif event == '-ICON_DIR_LIST-' and values['-ICON_DIR_LIST-']:
+        icon_name = values['-ICON_DIR_LIST-'][0]
+        imgs = list_icon_images(icon_name)
+        window['-ICON_IMG_LIST-'].update(values=imgs)
+        count = len(imgs)
+        color = 'yellow' if count < 3 or count > 5 else 'green'
+        window['-ICON_COUNT_STATUS-'].update(f'Count: {count} (Recommended 3-5)', text_color=color)
+        return None
+
+    elif event == '-ICON_IMG_LIST-' and values['-ICON_IMG_LIST-']:
+        img_path = values['-ICON_IMG_LIST-'][0]
+        try:
+            window['-ICON_PREVIEW-'].update(filename=img_path)
+        except Exception as e:
+            print("Preview failed", e)
+        return None
+
+    elif event == '-DELETE_ICON_IMG-':
+        if values['-ICON_IMG_LIST-']:
+            delete_icon_image(values['-ICON_IMG_LIST-'][0])
+            window.write_event_value('-ICON_DIR_LIST-', None)
+        return None
+
+    elif event == '-RELOAD_RECOVERY_QUEUE-':
+        queue = list_pending_recoveries()
+        display_list = [f"{item['element_name']} - {item['snapshot_path']}" for item in queue]
+        window['-RECOVERY_LIST-'].update(display_list)
+        
+        icons = list_icons()
+        if icons:
+            window['-SAVE_TARGET_ICON-'].update(values=icons, value=icons[0])
+        return None
+
+    elif event == '-RECOVERY_LIST-' and values['-RECOVERY_LIST-']:
+        selection = values['-RECOVERY_LIST-'][0]
+        path = selection.split(" - ")[-1]
+        try:
+            with Image.open(path) as img:
+                w, h = img.size
+                crop_state['img_w'] = w
+                crop_state['img_h'] = h
+                crop_state['path'] = path
+                img_resized = img.resize((600, 400), Image.Resampling.LANCZOS)
+                bio = io.BytesIO()
+                img_resized.save(bio, format="PNG")
+                
+            graph = window['-CROP_GRAPH-']
+            graph.erase()
+            graph.draw_image(data=bio.getvalue(), location=(0,0))
+            crop_state['clicks'] = []
+            crop_state['rect_id'] = None
+        except Exception as e:
+            print("Could not load graph preview", e)
+        return None
+
+    elif event == '-CROP_GRAPH-':
+        mouse = values['-CROP_GRAPH-']
+        if mouse == (None, None): return None
+        
+        graph = window['-CROP_GRAPH-']
+        clicks = crop_state['clicks']
+        
+        if len(clicks) == 2:
+            # reset
+            clicks.clear()
+            if crop_state['rect_id']:
+                graph.delete_figure(crop_state['rect_id'])
+                crop_state['rect_id'] = None
+                
+        clicks.append(mouse)
+        
+        if len(clicks) == 2:
+            pt1 = clicks[0]
+            pt2 = clicks[1]
+            # Ensure valid rectangle orientation
+            top_left = (min(pt1[0], pt2[0]), max(pt1[1], pt2[1]))
+            bottom_right = (max(pt1[0], pt2[0]), min(pt1[1], pt2[1]))
+            if crop_state['rect_id']: graph.delete_figure(crop_state['rect_id'])
+            crop_state['rect_id'] = graph.draw_rectangle(top_left, bottom_right, line_color='red')
+        return None
+
+    elif event == '-CROP_SAVE_RECOVERY-':
+        if len(crop_state['clicks']) != 2 or not crop_state['path']:
+            sg.popup('Please draw a crop box first (2 clicks).')
+            return None
+            
+        target = values['-SAVE_TARGET_ICON-']
+        if not target:
+            sg.popup('Select a target icon folder.')
+            return None
+            
+        # Map back to original resolution
+        pt1, pt2 = crop_state['clicks']
+        x1, y1 = pt1
+        x2, y2 = pt2
+        
+        min_x = min(x1, x2)
+        max_x = max(x1, x2)
+        min_y = min(y1, y2)
+        max_y = max(y1, y2)
+        
+        w_ratio = crop_state['img_w'] / 600.0
+        h_ratio = crop_state['img_h'] / 400.0
+        
+        # FreeSimpleGUI Graph maps (0,400) bottom_left to (600,0) top_right
+        # Y is inverted relative to PIL (PIL 0,0 is top left)
+        # So in our graph: location=(0,0) means image drawn at bottom-left? No, draw_image location is top_left.
+        # Wait, if graph geometry is bottom_left (0,400) and top_right (600,0), then Y=0 is TOP. Y=400 is BOTTOM.
+        # So top-left is (0,0) exactly like PIL.
+        
+        orig_left = int(min_x * w_ratio)
+        orig_right = int(max_x * w_ratio)
+        orig_top = int(min_y * h_ratio)
+        orig_bottom = int(max_y * h_ratio)
+        
+        box = (orig_left, orig_top, orig_right, orig_bottom)
+        if save_recovery_to_icon(crop_state['path'], box, target):
+            sg.popup(f'Successfully cropped and saved to {target}')
+            window.write_event_value('-RELOAD_RECOVERY_QUEUE-', None)
+            crop_state['clicks'].clear()
+            window['-CROP_GRAPH-'].erase()
+        else:
+            sg.popup('Error saving crop.')
+        return None
+
+    elif event == '-DELETE_RECOVERY-':
+        if values['-RECOVERY_LIST-']:
+            selection = values['-RECOVERY_LIST-'][0]
+            path = selection.split(" - ")[-1]
+            delete_recovery(path)
+            window.write_event_value('-RELOAD_RECOVERY_QUEUE-', None)
+            crop_state['clicks'].clear()
+            window['-CROP_GRAPH-'].erase()
+        return None
 
     # --- Display instructions ---
     if event == "-INSTRUCTIONS-":

@@ -1,101 +1,126 @@
-# WhatsApp Automation System ("AutoWA")
+# AutoWA — Professional WhatsApp Outreach & Workflow Automation
 
-![App](https://github.com/AbdulrahmanElshafie/AutoWA/blob/stage/AutoWA.PNG)
+AutoWA is a desktop automation platform built to streamline large-scale WhatsApp communication workflows with human-like behavior simulation, dynamic personalization, and document-based messaging.
 
-The **AutoWA** is a powerful, professional Python-based desktop tool designed to strictly streamline mass-messaging on WhatsApp Web. Built to maximize productivity, it uses a graphical interface to easily manage contacts, dynamically template messages, and safely automate document attachments with human-like accuracy.
+Designed for agencies, recruiters, sales teams, and operations-heavy workflows, it transforms repetitive WhatsApp outreach into a controlled and scalable system.
 
-[![Buy Me A Book](https://img.shields.io/badge/Buy%20Me%20A%20Book-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](https://www.buymeacoffee.com/abdulrahmanelshafie)
+![Demo Screenshot](./AutoWA.PNG)
 
-## 🌟 Prowess & Capabilities (Features)
-- **GUI Interface (FreeSimpleGUI)**: Seamlessly dictate target output sheets, browse paths, and modify active configuration profiles.
-- **Human-like Automation**: Leverages randomized typing delays, calculated batch intervals, and realistic pauses to emulate organic workflows and safely bypass immediate anti-bot detections.
-- **Dynamic Messaging**: Resolve complex template placeholders (like `{contact_name}`) on the fly, optionally picking random message variants per outbound contact.
-- **Document Attachments**: Easily attach and resolve individual files (like PDFs or Seglat images) explicitly per user right out of the input CSV.
-- **Account Rotation**: Add massive batch limits over multiple active WhatsApp Browser sessions to distribute loads between different accounts safely.
-- **Real-Time Synchronous GUI**: Visually tracks success rates, completion time estimations, and error handling seamlessly in an interactive terminal.
-
-## ⚠️ Known Weaknesses & Constraints
-- **Theme & Language Locked**: It currently only actively supports **WhatsApp Web in Dark Mode**, and resolves strictly to **English & Arabic**. To add more languages or light-mode interfaces, you must manually capture and include the matching icons for them in the `assets/` folder. The same limitation currently applies when introducing entirely new browsers not yet mapped.
-- **Number Routing Constraints**: Adding contacts programmatically currently assumes **Egyptian phone numbers** exclusively. Foreign (international) numbers are texted directly without going through the native 'Save Contact' book pipeline. Support for adding varied foreign formats is scheduled for future updates!
-- **Foreground Dedication**: It utilizes aggressive image-recognition (`pyautogui`). You **cannot** drastically move your mouse, cover the designated browser window, or minimize the tab while executing. The visual desktop environment essentially belongs to the bot during operations.
-
-## 🚀 Future Roadmap & "To Do" Highlights
-We are actively building toward making this system a comprehensive CRM tool. Exciting upcoming functionality includes:
-- **System Health & Log Dashboards**: Dedicated UI pages to visualize execution stats, error alarms, and deep system monitoring.
-- **Richer WhatsApp Interactions**: Sending live locations, injecting emojis natively, and formatting rich texts.
-- **Customer Support Agent Mode**: Turning the system from a unidirectional blasting mechanism into a bidirectional response-driven WhatsApp Support Agent.
-- **Foreign Number Optimization**: Deeply handling contact saving pipelines for non-Egyptian international targets.
-- **Global Stylization Support**: Allowing configuration-less swapping between Dark Mode and Light Mode, and auto-fallback languages.
+[Demo Video](YOUR_VIDEO_LINK)
 
 ---
 
-## 🛠 File Structure & Architecture
-This project is beautifully organized into clear layers so the GUI, core logic, and WhatsApp automation can evolve independently without creating tight coupling.
+## The Problem
 
-### Architecture Overview
-```
-Project Root
-├── GUI Layer
-├── Core Layer
-├── Automation Layer
-├── Configuration & Contracts
-├── Data Layer
-├── Assets Layer
-└── Logging & Diagnostics
-```
-### Layer Responsibilities
-- GUI Layer: handles user interaction, execution controls, and visual feedback.
-- Core Layer: loads jobs, validates input, and runs the execution workflow.
-- Automation Layer: performs the actual WhatsApp Web interaction.
-- Configuration & Contracts: stores system rules, schemas, and API contracts.
-- Data Layer: stores job input files.
-- Assets Layer: stores image references used for UI detection.
-- Logging & Diagnostics: stores logs and analysis helpers.
+Manual WhatsApp outreach becomes unsustainable when working with:
 
-###  Project Structure:
-```
-.
-├── app_main.pyw — Entry Point
-├── core/ — Execution Engine: Handles the main system logic
-├── app/ — Automation Layer: Controls WhatsApp Web via desktop automation.
-├── gui/ — GUI: Handles all user interaction and execution control.
-├── assets/ — UI Detection Images: Contains screenshots used for WhatsApp Web automation. Organized by UI components (Send, Chat, Contact, etc.).
-├── config/ — Configuration & Templates: Stores runtime settings and reusable messages.
-├── data/ — Input Data: jobs.csv → main dataset used for execution
-├── contracts/ — System Interfaces for Agents: Defines how components interact.
-├── schemas/ — Data Definitions: Defines structure of all inputs.
-├── docs/ — System Documentation: system_contract.md → overall architecture and rules
-├── logs/ — Logs: Stores runtime logs and error tracking
-```
+- hundreds of leads
+- repeated follow-ups
+- personalized messaging
+- document attachments
+- multiple account sessions
+
+Common challenges include:
+
+- time-consuming repetitive tasks
+- inconsistent personalization
+- operational mistakes
+- account safety risks from bot-like behavior
+- lack of workflow visibility
+
+Traditional bulk messaging tools often feel robotic and increase the risk of account restrictions.
 
 ---
 
-## ⚙️ Usage Instructions
+## The Solution
 
-### 1. Requirements & Setup
-- Windows OS naturally.
-- **Chrome** (or Edge) installed.
-- Python 3.8+ with dependencies:
-  ```bash
-  pip install FreeSimpleGUI pandas pyautogui pyperclip opencv-python
-  ```
+AutoWA simulates realistic user behavior while providing structured workflow controls.
 
-### 2. Prepare Assets
-Ensure you have perfectly cropped `.PNG` screenshots in your `assets/` folder covering the specific WhatsApp Web buttons you need to click (such as 'New Chat', 'Add Doc', 'Send', etc.). If your computer's resolution scales the browser oddly, you might need to retake the screenshots!
+Key capabilities include:
 
-### 3. Launching
-```bash
-python app_main.pyw
-```
-1. **Settings / Paths**: Browse for your Target Data CSV (conforming to `schemas/jobs.schema.md`).
-2. **Operations**: Select the target wait limits, batch capacities, and profile delays.
-3. Write your fixed message or choose your Dynamic Template variants.
-4. Hit **Execute / Resume** and let go of your mouse!
+- human-like randomized typing delays
+- dynamic message templates
+- batch interval control
+- account rotation
+- document attachments per contact
+- live execution tracking
+- recovery & resume workflows
+
+This allows teams to scale WhatsApp communication while maintaining more natural interaction patterns.
 
 ---
 
-## 🤝 Contributing
-Contributions are absolutely welcome! If you intend to:
-- **Patch Core Engine**: Make sure changes in `core/ runner.py` handle custom exceptions.
-- **Expand Browser/Icon Sets**: Provide clean `.PNG` files. Add references into `WAController.py`.
-- **Add New Fields**: Keep `schemas/jobs.schema.md` actively updated.
+## Demo
+
+🎥 **Watch the full demo**
+[Insert Loom / YouTube / LinkedIn video link]
+
+Recommended demo flow:
+
+1. import contacts CSV
+2. select template
+3. attach files
+4. launch automation
+5. show progress dashboard
+6. demonstrate human-like pauses
+
+---
+
+## Use Cases
+
+### Lead Generation & Sales Outreach
+Send personalized first-touch and follow-up messages to lead lists.
+
+### Recruitment & HR
+Automate candidate communication and document delivery.
+
+### Customer Support Operations
+Handle repetitive support-side messaging workflows.
+
+### Agency / Marketing Outreach
+Scale campaign communication across multiple accounts.
+
+### Internal Operations
+Send structured reminders, approvals, and updates.
+
+---
+
+## Core Features
+
+- **Human-like Execution:** Randomized typing delays and dynamic workflow pacing.
+- **Dynamic Messaging:** Resolves custom template placeholders (e.g., `{company_name}`) accurately.
+- **Variant Randomization:** Pick from multiple message variants to prevent repetitive spam detection.
+- **Document Handling:** Safely attach individual or globally defined files (PDFs, Images) explicitly per contact.
+- **Live System Health:** Monitor execution via an actionable Dashboard tracking metrics and throughput.
+- **Automated Account Rotation:** Split batches across multiple active Chrome sessions seamlessly.
+- **Smart Resumption:** Automatically resume from last processed state if interrupted.
+- **Session Analytics:** Review throughput metrics per active session securely.
+
+---
+
+## Technical Documentation
+
+**Are you a developer looking to contribute or understand the codebase?**
+This system is strictly modularized with separate layers governing execution loops, GUI layouts, telemetry tracking, and DOM interactions. 
+
+👉 **[Read the System Architecture & Technical Guidelines in `docs/README.md`](docs/README.md)**
+
+---
+
+## Known Constraints
+
+- Windows desktop only
+- foreground execution required
+- image-recognition dependent
+- currently optimized for Egyptian workflows
+- dark mode support prioritized
+
+---
+
+## Roadmap
+
+- analytics dashboard
+- support-agent mode
+- global number formatting
+- multilingual UI
+- richer interaction types
