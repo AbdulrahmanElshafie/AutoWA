@@ -8,7 +8,7 @@ import random
 from .job_loader import load_jobs, save_jobs
 from .validator import validate_jobs
 from .job_model import JobStatus
-from logger import log_function, log_execution
+from logger import log_function, log_execution, set_session_id, clear_session_id
 from app.WAController import WAController
 import FreeSimpleGUI as sg
 import uuid
@@ -69,6 +69,7 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
 
     controllers = [WAController(profile, browser=b) for b in browsers]
     session_id = str(uuid.uuid4())
+    set_session_id(session_id)  # Propagate session_id into all text log lines
     msgs_in_current_batch = 0
 
     stats = {
@@ -221,5 +222,5 @@ def execute_jobs(csv_path: str, window=None) -> Dict[str, int]:
 
     # Save the updated statuses to original CSV
     save_jobs(csv_path, jobs)
-    
+    clear_session_id()  # Remove session context from log lines
     return stats

@@ -63,6 +63,22 @@ def delete_recovery(filepath: str) -> bool:
         return True
     return False
 
+def crop_snapshot(snapshot_path: str, crop_box: tuple):
+    """
+    Crops the snapshot according to crop_box and returns the resulting PIL Image object.
+    Does NOT write to disk or delete any files.
+    Returns the cropped PIL Image on success, or None on failure.
+    crop_box should be (left, top, right, bottom).
+    """
+    try:
+        with Image.open(snapshot_path) as img:
+            cropped_img = img.crop(crop_box)
+            # Return a copy so the file handle can be closed cleanly
+            return cropped_img.copy()
+    except Exception as e:
+        print(f"Error while cropping: {e}")
+        return None
+
 def save_recovery_to_icon(snapshot_path: str, crop_box: tuple, target_icon: str) -> bool:
     """
     Crops the snapshot and saves it into the target icon directory.
@@ -88,6 +104,32 @@ def save_recovery_to_icon(snapshot_path: str, crop_box: tuple, target_icon: str)
         
     except Exception as e:
         print(f"Error while saving crop: {e}")
+        return False
+
+def save_cropped_image_to_icon(cropped_img, snapshot_path: str, target_icon: str) -> bool:
+    """
+    Saves a pre-cropped PIL Image into the target icon directory and removes
+    the original snapshot from the review queue.
+    This is used when the Crop step has already been performed separately.
+
+    Parameters:
+    - cropped_img: PIL Image object (already cropped)
+    - snapshot_path: original snapshot path (deleted after successful save)
+    - target_icon: name of the icon folder to save into
+    """
+    target_dir = os.path.join(ICONS_DIR, target_icon)
+    os.makedirs(target_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_filepath = os.path.join(target_dir, f"{target_icon}_{timestamp}.png")
+
+    try:
+        cropped_img.save(new_filepath)
+        delete_recovery(snapshot_path)
+        print(f"Saved cropped image for {target_icon} to {new_filepath}")
+        return True
+    except Exception as e:
+        print(f"Error while saving cropped image: {e}")
         return False
 
 # ----------------------------------------------------

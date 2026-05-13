@@ -1,5 +1,9 @@
 import FreeSimpleGUI as sg
 
+# Fixed dimensions for the icon preview box (pixels)
+PREVIEW_W = 500
+PREVIEW_H = 400
+
 # ----------------------------------------------------
 # Usage Icons Layout
 # ----------------------------------------------------
@@ -16,9 +20,12 @@ usage_icons_layout = [
         ])
     ],
     [
+        # Fixed-size preview container — never resizes with image content
         sg.Column([
             [sg.Text('Preview:')],
-            [sg.Image(key='-ICON_PREVIEW-', size=(300, 200), background_color='black')]
+            [sg.Frame('', [
+                [sg.Image(key='-ICON_PREVIEW-', size=(PREVIEW_W, PREVIEW_H))]
+            ], size=(PREVIEW_W, PREVIEW_H), pad=(0, 0), relief=sg.RELIEF_SUNKEN)]
         ], element_justification='c', expand_x=True),
         sg.Column([
             [sg.Button('Delete Image', key='-DELETE_ICON_IMG-', button_color=('white', 'red'), expand_x=True)],
@@ -37,7 +44,7 @@ recovery_queue_layout = [
         sg.Listbox(values=[], size=(75, 5), key='-RECOVERY_LIST-', enable_events=True, expand_x=True)
     ],
     [
-        sg.Text('Click Top-Left, then click Bottom-Right to box crop. Image is scaled for preview. (3rd click resets the box)')
+        sg.Text('Click and drag to draw a crop box. Release to confirm. Click and drag again to redraw.')
     ],
     [
         # The Graph will be 600x400. Real coordinates will be mapped by events.
@@ -47,14 +54,17 @@ recovery_queue_layout = [
             graph_top_right=(600, 0),
             key='-CROP_GRAPH-',
             enable_events=True,
-            drag_submits=False,
+            drag_submits=True,
             background_color='gray'
         )
     ],
     [
         sg.Text('Save to Icon:'),
         sg.Combo(values=[], key='-SAVE_TARGET_ICON-', size=(30, 1), readonly=True),
-        sg.Button('Crop & Save', key='-CROP_SAVE_RECOVERY-', button_color=('white', 'seagreen')),
+        sg.Button('Crop', key='-CROP_RECOVERY-', button_color=('white', 'steelblue')),
+        sg.Button('Undo', key='-UNDO_CROP-', button_color=('white', '#7c5cbf'), disabled=True),
+        sg.Button('Redo', key='-REDO_CROP-', button_color=('white', '#5c7cbf'), disabled=True),
+        sg.Button('Save', key='-CROP_SAVE_RECOVERY-', button_color=('white', 'seagreen')),
         sg.Button('Delete Recovery', key='-DELETE_RECOVERY-', button_color=('white', 'red')),
         sg.Button('Reload Queue', key='-RELOAD_RECOVERY_QUEUE-')
     ]

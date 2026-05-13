@@ -117,3 +117,83 @@ def get_system_health(logs: List[Dict]) -> Dict:
         "repeated_issues": [err.__dict__ for err in detect_repeated_errors(logs)],
         "critical_issues": [err.__dict__ for err in detect_critical_failures(logs)]
     }
+
+def get_alert_log_details(
+    error_type: str,
+    logs: List[Dict],
+    jsonl_path: str = "logs/execution_log.jsonl",
+    error_log_path: str = "logs/error.log",
+    max_traceback_lines: int = 10
+) -> str:
+    """
+    Build a rich detail string for a health alert by correlating JSONL execution
+    entries with matching error.log blocks via session_id.
+
+    Strategy:
+    1. Find all JSONL entries whose error_type matches.
+    2. Collect their unique session_ids and timestamps.
+    3. Scan error.log for blocks that contain [session_id=<sid>].
+    4. Return the first matching traceback (capped to max_traceback_lines),
+       plus summary metadata.
+
+    Falls back gracefully if log files are missing or no match is found.
+    """
+    import os
+    import json
+
+    # --- Step 1: collect matching JSONL entries ---
+    matching_entries = [
+        log for log in logs
+        if log.get("error_type") == error_type and log.get("status") == "failed"
+    ]
+
+    if not matching_entries:
+        return f"No execution log entries found for error type: {error_type}"
+
+    session_ids = list({e.get("session_id") for e in matching_entries if e.get("session_id")})
+    occurrences = len(matching_entries)
+    timestamps = [e.get("timestamp", "") for e in matching_entries if e.get("timestamp")]
+
+    lines = [
+        f"Error Type:   {error_type}",
+        f"Occurrences:  {occurrences}",
+        f"Sessions:     {', '.join(session_ids) if session_ids else 'N/A'}",
+        f"First seen:   {min(timestamps)[:19] if timestamps else 'N/A'}",
+        f"Last seen:    {max(timestamps)[:19] if timestamps else 'N/A'}",
+        "",
+    ]
+
+    # --- Step 2: find a traceback block in error.log for one of the session_ids ---
+    traceback_found = False
+    if session_ids and os.path.exists(error_log_path):
+        try:
+            with open(error_log_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+
+            # Split into blocks separated by blank lines between ERROR entries
+            # Each block starts at a line containing "| ERROR |"
+            raw_blocks = content.strip().split("\n\n")
+
+            for sid in session_ids:
+                tag = f"[session_id={sid}]"
+                for block in raw_blocks:
+                    if tag in block:
+                        # Keep the first max_traceback_lines lines of the block
+                        block_lines = block.strip().splitlines()
+                        trimmed = block_lines[:max_traceback_lines]
+                        if len(block_lines) > max_traceback_lines:
+                            trimmed.append(f"  ... ({len(block_lines) - max_traceback_lines} more lines)")
+                        lines.append("--- Error Log ---")
+                        lines.extend(trimmed)
+                        traceback_found = True
+                        break
+                if traceback_found:
+                    break
+        except Exception as e:
+            lines.append(f"(Could not read error.log: {e})")
+
+    if not traceback_found:
+        lines.append("No matching traceback found in error.log for these sessions.")
+
+    return "\n".join(lines)
+

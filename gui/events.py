@@ -26,15 +26,62 @@ from .layout import config
 from .helpers import *
 import math
 from analytics.analyzer import get_full_analytics, load_logs
-from monitoring.health import get_system_health
-from icons_management.logic import list_icons, list_icon_images, delete_icon_image, list_pending_recoveries, delete_recovery, save_recovery_to_icon
+from monitoring.health import get_system_health, get_alert_log_details
+from icons_management.logic import list_icons, list_icon_images, delete_icon_image, list_pending_recoveries, delete_recovery, save_recovery_to_icon, crop_snapshot, save_cropped_image_to_icon
+from icons_management.gui import PREVIEW_W, PREVIEW_H
 import base64
 from PIL import Image
 import io
 
 # Global flag to indicate if the sending process is currently running
 running = False  
-crop_state = {'clicks': [], 'rect_id': None, 'img_w': 0, 'img_h': 0, 'path': None}
+crop_state = {
+    'drag_start': None, 'rect_id': None,
+    'img_w': 0, 'img_h': 0,
+    'path': None,       # path to original full snapshot
+    'full_bio': None,   # bytes of the scaled full image (600x400)
+    'box': None,        # confirmed drag box in display coords
+    'crnt': None,       # PIL Image currently shown in the graph (active crop)
+    'crnt_bio': None,   # cached PNG bytes of crnt letterboxed at 600x400
+    'undo_stack': [],   # stack of (pil, bio) tuples — push old crnt on Crop
+    'redo_stack': [],   # stack of (pil, bio) tuples — push old crnt on Undo
+}
+# Maps each alert display string -> full detail message shown on click
+alert_details = {}
+
+def _render_crop_to_bytes(cropped_pil, out_bio=None):
+    """
+    Letterbox a cropped PIL Image into a 600x400 canvas (black bars).
+    Writes PNG bytes into out_bio if provided, otherwise a new BytesIO.
+    Returns the BytesIO with position at the start.
+    """
+    CANVAS_W, CANVAS_H = 600, 400
+    thumb = cropped_pil.copy()
+    thumb.thumbnail((CANVAS_W, CANVAS_H), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (0, 0, 0))
+    x_off = (CANVAS_W - thumb.width) // 2
+    y_off = (CANVAS_H - thumb.height) // 2
+    canvas.paste(thumb, (x_off, y_off))
+    if out_bio is None:
+        out_bio = io.BytesIO()
+    canvas.save(out_bio, format='PNG')
+    out_bio.seek(0)
+    return out_bio
+
+
+def _render_crop_preview(window, cropped_pil):
+    """
+    Render a cropped PIL Image in the 600x400 crop Graph canvas (letterboxed).
+    Also updates crop_state['crnt_bio'] cache.
+    """
+    bio = _render_crop_to_bytes(cropped_pil)
+    data = bio.read()
+    crop_state['crnt_bio'] = data
+    graph = window['-CROP_GRAPH-']
+    graph.erase()
+    graph.draw_image(data=data, location=(0, 0))
+
+
 
 def handle_events(event, values, window):
     """
@@ -370,9 +417,34 @@ def handle_events(event, values, window):
         color = health['color'] 
         window['-HEALTH_STATUS-'].update(status, text_color=color)
         window['-HEALTH_SCORE-'].update(str(score))
-        alerts = [f"CRITICAL: {e['type']}" for e in health['critical_issues']] + \
-                 [f"REPEATED: {e['type']}" for e in health['repeated_issues']]
+
+        # Build display list and a lookup for full log-enriched details
+        alert_details.clear()
+        alerts = []
+        for e in health['critical_issues']:
+            label = f"[CRITICAL] {e['type']}"
+            alerts.append(label)
+            alert_details[label] = get_alert_log_details(
+                e['type'], logs,
+                jsonl_path="logs/execution_log.jsonl",
+                error_log_path="logs/error.log"
+            )
+        for e in health['repeated_issues']:
+            label = f"[REPEATED] {e['type']}"
+            alerts.append(label)
+            alert_details[label] = get_alert_log_details(
+                e['type'], logs,
+                jsonl_path="logs/execution_log.jsonl",
+                error_log_path="logs/error.log"
+            )
         window['-ALERTS-'].update(alerts)
+        window['-ALERT_DETAIL-'].update('Click an alert to view details.')
+        return None
+
+    elif event == '-ALERTS-' and values['-ALERTS-']:
+        selected = values['-ALERTS-'][0]
+        detail = alert_details.get(selected, 'No additional details available.')
+        window['-ALERT_DETAIL-'].update(detail)
         return None
 
     elif event == '-REFRESH_ICONS-':
@@ -393,9 +465,19 @@ def handle_events(event, values, window):
     elif event == '-ICON_IMG_LIST-' and values['-ICON_IMG_LIST-']:
         img_path = values['-ICON_IMG_LIST-'][0]
         try:
-            window['-ICON_PREVIEW-'].update(filename=img_path)
+            # Fit image into fixed 300x200 box with letterboxing (black background)
+            with Image.open(img_path) as src:
+                src_copy = src.copy()
+            src_copy.thumbnail((PREVIEW_W, PREVIEW_H), Image.Resampling.LANCZOS)
+            canvas = Image.new('RGB', (PREVIEW_W, PREVIEW_H), (0, 0, 0))
+            x_off = (PREVIEW_W - src_copy.width) // 2
+            y_off = (PREVIEW_H - src_copy.height) // 2
+            canvas.paste(src_copy, (x_off, y_off))
+            bio = io.BytesIO()
+            canvas.save(bio, format='PNG')
+            window['-ICON_PREVIEW-'].update(data=bio.getvalue())
         except Exception as e:
-            print("Preview failed", e)
+            print('Preview failed', e)
         return None
 
     elif event == '-DELETE_ICON_IMG-':
@@ -423,87 +505,193 @@ def handle_events(event, values, window):
                 crop_state['img_w'] = w
                 crop_state['img_h'] = h
                 crop_state['path'] = path
+                # Keep a PIL copy of the scaled image as the initial 'crnt' state
+                # so the very first crop can push it onto the undo stack
                 img_resized = img.resize((600, 400), Image.Resampling.LANCZOS)
                 bio = io.BytesIO()
-                img_resized.save(bio, format="PNG")
-                
+                img_resized.save(bio, format='PNG')
+                bio.seek(0)
+                full_pil = Image.open(bio).copy()  # detached PIL Image
+
+            # Cache bytes for fast redraw, and PIL for undo state
+            bio2 = io.BytesIO()
+            full_pil.save(bio2, format='PNG')
+            crop_state['full_bio'] = bio2.getvalue()
+            crop_state['crnt'] = full_pil   # first crop will push this to undo_stack
+            crop_state['crnt_bio'] = None   # no crop preview yet — drag uses full_bio
+
             graph = window['-CROP_GRAPH-']
             graph.erase()
-            graph.draw_image(data=bio.getvalue(), location=(0,0))
-            crop_state['clicks'] = []
+            graph.draw_image(data=crop_state['full_bio'], location=(0, 0))
+            # Full reset for the new image
+            crop_state['drag_start'] = None
             crop_state['rect_id'] = None
+            crop_state['box'] = None
+            crop_state['crnt_bio'] = None
+            crop_state['undo_stack'] = []
+            crop_state['redo_stack'] = []
+            window['-UNDO_CROP-'].update(disabled=True)
+            window['-REDO_CROP-'].update(disabled=True)
         except Exception as e:
-            print("Could not load graph preview", e)
+            print('Could not load graph preview', e)
         return None
 
-    elif event == '-CROP_GRAPH-':
+    elif event == '-CROP_GRAPH-':  # Mouse button pressed / dragging
         mouse = values['-CROP_GRAPH-']
         if mouse == (None, None): return None
-        
+
         graph = window['-CROP_GRAPH-']
-        clicks = crop_state['clicks']
-        
-        if len(clicks) == 2:
-            # reset
-            clicks.clear()
-            if crop_state['rect_id']:
-                graph.delete_figure(crop_state['rect_id'])
-                crop_state['rect_id'] = None
-                
-        clicks.append(mouse)
-        
-        if len(clicks) == 2:
-            pt1 = clicks[0]
-            pt2 = clicks[1]
-            # Ensure valid rectangle orientation
+
+        if crop_state['drag_start'] is None:
+            # First contact: record the start of the drag
+            crop_state['drag_start'] = mouse
+        else:
+            # Dragging: restore the current background cleanly, then redraw rect
+            # Use cached crnt_bio if a crop preview is active, else the full image
+            bg = crop_state['crnt_bio'] if crop_state['crnt_bio'] else crop_state['full_bio']
+            if bg:
+                graph.erase()
+                graph.draw_image(data=bg, location=(0, 0))
+
+            pt1 = crop_state['drag_start']
+            pt2 = mouse
             top_left = (min(pt1[0], pt2[0]), max(pt1[1], pt2[1]))
             bottom_right = (max(pt1[0], pt2[0]), min(pt1[1], pt2[1]))
-            if crop_state['rect_id']: graph.delete_figure(crop_state['rect_id'])
             crop_state['rect_id'] = graph.draw_rectangle(top_left, bottom_right, line_color='red')
         return None
 
-    elif event == '-CROP_SAVE_RECOVERY-':
-        if len(crop_state['clicks']) != 2 or not crop_state['path']:
-            sg.popup('Please draw a crop box first (2 clicks).')
+    elif event == '-CROP_GRAPH-+UP':  # Mouse button released — finalise box
+        mouse = values['-CROP_GRAPH-']
+        if crop_state['drag_start'] is None or mouse == (None, None):
             return None
-            
+
+        graph = window['-CROP_GRAPH-']
+        pt1 = crop_state['drag_start']
+        pt2 = mouse
+
+        top_left = (min(pt1[0], pt2[0]), max(pt1[1], pt2[1]))
+        bottom_right = (max(pt1[0], pt2[0]), min(pt1[1], pt2[1]))
+
+        # Draw the final confirmed box — do NOT reset the background here
+        # so that any active crop preview is preserved
+        if crop_state['rect_id']:
+            graph.delete_figure(crop_state['rect_id'])
+        crop_state['rect_id'] = graph.draw_rectangle(top_left, bottom_right, line_color='red')
+
+        # Store confirmed box and reset drag
+        crop_state['box'] = (pt1, pt2)
+        crop_state['drag_start'] = None
+        return None
+
+    elif event == '-CROP_RECOVERY-':
+        # Crop: compute the crop region, update crnt, push old crnt to undo_stack
+        if not crop_state['box'] or crop_state['crnt'] is None:
+            sg.popup('Please draw a crop box first (click and drag).')
+            return None
+
+        pt1, pt2 = crop_state['box']
+        min_x = min(pt1[0], pt2[0])
+        max_x = max(pt1[0], pt2[0])
+        min_y = min(pt1[1], pt2[1])
+        max_y = max(pt1[1], pt2[1])
+
+        crnt_img = crop_state['crnt']
+        CANVAS_W, CANVAS_H = 600, 400
+        thumb = crnt_img.copy()
+        thumb.thumbnail((CANVAS_W, CANVAS_H), Image.Resampling.LANCZOS)
+        
+        x_off = (CANVAS_W - thumb.width) // 2
+        y_off = (CANVAS_H - thumb.height) // 2
+
+        # Adjust display coords by removing the black bar offsets
+        thumb_min_x = max(0, min_x - x_off)
+        thumb_max_x = min(thumb.width, max_x - x_off)
+        thumb_min_y = max(0, min_y - y_off)
+        thumb_max_y = min(thumb.height, max_y - y_off)
+
+        # Check if the crop is completely outside the actual image
+        if thumb_min_x >= thumb_max_x or thumb_min_y >= thumb_max_y:
+            sg.popup('Crop region is outside the image.')
+            return None
+
+        # Scale coordinates from thumbnail size to actual crnt size
+        scale_x = crnt_img.width / thumb.width
+        scale_y = crnt_img.height / thumb.height
+
+        orig_left   = int(thumb_min_x * scale_x)
+        orig_right  = int(thumb_max_x * scale_x)
+        orig_top    = int(thumb_min_y * scale_y)
+        orig_bottom = int(thumb_max_y * scale_y)
+
+        try:
+            new_crop = crnt_img.crop((orig_left, orig_top, orig_right, orig_bottom))
+        except Exception as e:
+            print("Crop failed:", e)
+            sg.popup('Crop failed. Please try again.')
+            return None
+
+        # Push current crnt to undo stack (if there is one); clear redo stack
+        if crop_state['crnt'] is not None:
+            crop_state['undo_stack'].append(crop_state['crnt'])
+        crop_state['redo_stack'].clear()
+
+        # Update crnt and show the new crop in the graph
+        crop_state['crnt'] = new_crop
+        _render_crop_preview(window, new_crop)
+
+        # Enable Undo (we have something to go back to); disable Redo (no forward)
+        window['-UNDO_CROP-'].update(disabled=not crop_state['undo_stack'])
+        window['-REDO_CROP-'].update(disabled=True)
+        return None
+
+    elif event == '-UNDO_CROP-':
+        # Undo: push crnt to redo_stack, pop undo_stack into crnt
+        if crop_state['undo_stack']:
+            crop_state['redo_stack'].append(crop_state['crnt'])
+            crop_state['crnt'] = crop_state['undo_stack'].pop()
+            _render_crop_preview(window, crop_state['crnt'])
+            window['-UNDO_CROP-'].update(disabled=not crop_state['undo_stack'])
+            window['-REDO_CROP-'].update(disabled=False)
+        return None
+
+    elif event == '-REDO_CROP-':
+        # Redo: push crnt to undo_stack, pop redo_stack into crnt
+        if crop_state['redo_stack']:
+            crop_state['undo_stack'].append(crop_state['crnt'])
+            crop_state['crnt'] = crop_state['redo_stack'].pop()
+            _render_crop_preview(window, crop_state['crnt'])
+            window['-UNDO_CROP-'].update(disabled=False)
+            window['-REDO_CROP-'].update(disabled=not crop_state['redo_stack'])
+        return None
+
+    elif event == '-CROP_SAVE_RECOVERY-':
+        # Save: write the current crnt image to the icon folder
+        if crop_state['crnt'] is None or not crop_state['path']:
+            sg.popup('No cropped image ready. Please use the Crop button first.')
+            return None
+
         target = values['-SAVE_TARGET_ICON-']
         if not target:
             sg.popup('Select a target icon folder.')
             return None
-            
-        # Map back to original resolution
-        pt1, pt2 = crop_state['clicks']
-        x1, y1 = pt1
-        x2, y2 = pt2
-        
-        min_x = min(x1, x2)
-        max_x = max(x1, x2)
-        min_y = min(y1, y2)
-        max_y = max(y1, y2)
-        
-        w_ratio = crop_state['img_w'] / 600.0
-        h_ratio = crop_state['img_h'] / 400.0
-        
-        # FreeSimpleGUI Graph maps (0,400) bottom_left to (600,0) top_right
-        # Y is inverted relative to PIL (PIL 0,0 is top left)
-        # So in our graph: location=(0,0) means image drawn at bottom-left? No, draw_image location is top_left.
-        # Wait, if graph geometry is bottom_left (0,400) and top_right (600,0), then Y=0 is TOP. Y=400 is BOTTOM.
-        # So top-left is (0,0) exactly like PIL.
-        
-        orig_left = int(min_x * w_ratio)
-        orig_right = int(max_x * w_ratio)
-        orig_top = int(min_y * h_ratio)
-        orig_bottom = int(max_y * h_ratio)
-        
-        box = (orig_left, orig_top, orig_right, orig_bottom)
-        if save_recovery_to_icon(crop_state['path'], box, target):
-            sg.popup(f'Successfully cropped and saved to {target}')
+
+        if save_cropped_image_to_icon(crop_state['crnt'], crop_state['path'], target):
+            sg.popup(f'Successfully saved to {target}')
             window.write_event_value('-RELOAD_RECOVERY_QUEUE-', None)
-            crop_state['clicks'].clear()
+            # Full reset after successful save
+            crop_state['crnt'] = None
+            crop_state['crnt_bio'] = None
+            crop_state['box'] = None
+            crop_state['drag_start'] = None
+            crop_state['rect_id'] = None
+            crop_state['full_bio'] = None
+            crop_state['undo_stack'] = []
+            crop_state['redo_stack'] = []
+            window['-UNDO_CROP-'].update(disabled=True)
+            window['-REDO_CROP-'].update(disabled=True)
             window['-CROP_GRAPH-'].erase()
         else:
-            sg.popup('Error saving crop.')
+            sg.popup('Error saving image.')
         return None
 
     elif event == '-DELETE_RECOVERY-':
@@ -512,7 +700,16 @@ def handle_events(event, values, window):
             path = selection.split(" - ")[-1]
             delete_recovery(path)
             window.write_event_value('-RELOAD_RECOVERY_QUEUE-', None)
-            crop_state['clicks'].clear()
+            crop_state['drag_start'] = None
+            crop_state['box'] = None
+            crop_state['rect_id'] = None
+            crop_state['crnt'] = None
+            crop_state['crnt_bio'] = None
+            crop_state['full_bio'] = None
+            crop_state['undo_stack'] = []
+            crop_state['redo_stack'] = []
+            window['-UNDO_CROP-'].update(disabled=True)
+            window['-REDO_CROP-'].update(disabled=True)
             window['-CROP_GRAPH-'].erase()
         return None
 
