@@ -124,15 +124,13 @@ Stores templates, schemas, job inputs, logs, and assets.
 - Windows desktop only
 - foreground execution required
 - image-recognition dependent
-- currently optimized for Egyptian workflows
-- dark mode support prioritized
 
 ---
 
 ## Roadmap
 
-- analytics dashboard
-- support-agent mode
-- global number formatting
-- multilingual UI
-- richer interaction types
+- support-agent mode (AI Customer Support)
+- global number formatting (non-Egyptian phone numbers)
+- richer interaction types (locations, emojis, etc.)
+- UI notifications for monitoring (red dot alerts)
+- localized icon search regions for better precision

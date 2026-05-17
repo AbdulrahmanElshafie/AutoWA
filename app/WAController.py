@@ -35,7 +35,7 @@ class WAController:
     """
     
     # Base path for all UI image assets (relative to this file)
-    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets") + os.sep
+    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "icons") + os.sep
     
     """
     =====================
@@ -144,17 +144,24 @@ class WAController:
         else:
             powershell_command = f'powershell -Command "Start-Process {executable_str} \'https://web.whatsapp.com/\'"'
             
-        subprocess.run(powershell_command, shell=True)
+        try:
+            subprocess.run(powershell_command, shell=True, check=True)
+        except subprocess.CalledProcessError:
+            raise Exception("BROWSER_CRASH: Failed to launch browser process.")
 
         # Wait till the command is executed 
         time.sleep(3)
 
         # Reset the browser tab and zoom 
-        self.maximise_tab(wa_account)        
-        self.reset_zoom(wa_account)
+        try:
+            self.maximise_tab(wa_account)        
+            self.reset_zoom(wa_account)
+        except Exception:
+            raise Exception("BROWSER_CRASH: Could not manipulate browser tab.")
         
         # Wait until WhatsApp main UI appears
-        self.controller.wait(self.base_path + "WA", confidence=0.5)
+        if not self.controller.wait(self.base_path + "WA", max_attempts=4, max_wait=10, confidence=0.5):
+            raise Exception("DISCONNECTED: WhatsApp Web failed to load, indicating a connection or UI issue.")
         
     @log_function
     def close_wa(self):
@@ -227,7 +234,7 @@ class WAController:
             else:
                 return False, "Number not on WhatsApp"
         except Exception as e:
-            return False, "Failed to add number - unexpected error. Check icon images."
+            return False, f"FATAL_ERROR: Failed to add number - unexpected error. {str(e)}"
         
     @log_function
     def delete_contact(self):
@@ -278,11 +285,11 @@ class WAController:
             # We pass an empty name as contact naming may not be needed for direct send from core
             success, msg = self.add_contact(number, contact_name)
             if not success:
-                return False, "whatsapp_not_detected"
+                return False, msg
 
             # Find the msg box in the chat
             if not self.controller.wait(self.base_path + "Msg Bar", 3):
-                return False, "whatsapp_not_detected"
+                return False, "FATAL_ERROR: whatsapp_not_detected"
 
             # Type out the text message if any
             if message:
@@ -315,4 +322,4 @@ class WAController:
 
             return True, ""
         except Exception as e:
-            return False, "send_failure"
+            return False, f"FATAL_ERROR: send_failure. {str(e)}"

@@ -24,6 +24,10 @@ It only defines *what* the GUI looks like.
 import FreeSimpleGUI as sg
 from .helpers import load_config, load_messages
 
+from analytics.gui import analytics_layout
+from monitoring.gui import monitoring_layout
+from icons_management.gui import icons_management_layout
+
 # Load persisted configuration (paths, profiles, etc.)
 # This allows the GUI to preload previously saved values
 config = load_config()
@@ -189,9 +193,16 @@ right_col = [
 # -------------------------------------------------------------------
 # Main Window Layout (Two Columns)
 # -------------------------------------------------------------------
-layout = [
+operations_layout = [
     [sg.Column(right_col, element_justification='c', vertical_alignment='t'), 
      sg.VSeperator(), 
      sg.Column(left_col, element_justification='c', vertical_alignment='t')]
 ]
+
+layout = [[sg.TabGroup([[
+    sg.Tab('Operations', operations_layout),
+    sg.Tab('Analytics', analytics_layout),
+    sg.Tab('Monitoring', monitoring_layout),
+    sg.Tab('Icons Management', icons_management_layout)
+]], expand_x=True, expand_y=True)]]
 
