@@ -3,6 +3,9 @@ import os
 import traceback
 import functools
 import time
+import json
+import threading
+from datetime import datetime
 
 # --------------------------------------------------
 # Setup logging folder
@@ -55,6 +58,30 @@ console_handler.setFormatter(formatter)
 
 # Flag to track if console logging is enabled
 _console_enabled = False
+
+# --------------------------------------------------
+# Session ID context (per-thread)
+# --------------------------------------------------
+# Stores the active session_id for the current thread so that every log
+# line written via log_info / log_error automatically includes it.
+_session_local = threading.local()
+
+def set_session_id(session_id: str):
+    """
+    Set the session_id that will be prepended to all subsequent log messages
+    on this thread. Call this at the start of each execution session.
+    """
+    _session_local.session_id = session_id
+
+def clear_session_id():
+    """
+    Clear the current thread's session_id after a session ends.
+    """
+    _session_local.session_id = None
+
+def _current_session_id() -> str | None:
+    """Return the active session_id for the current thread, or None."""
+    return getattr(_session_local, 'session_id', None)
 
 def enable_console_logging(level=logging.INFO):
     """
@@ -122,9 +149,13 @@ def log_info(msg: str, **kwargs):
     - kwargs: Optional key-value pairs to include in the log
 
     Logic:
+    - Prepends the active session_id (if set) to the message for traceability
     - If additional details are provided via kwargs, they are appended to the message
     - Uses _safe_repr to ensure objects are safely represented
     """
+    sid = _current_session_id()
+    if sid:
+        msg = f"[session_id={sid}] {msg}"
     if kwargs:
         details = " | ".join(f"{k}={_safe_repr(v)}" for k, v in kwargs.items())
         msg = f"{msg} | {details}"
@@ -140,9 +171,13 @@ def log_error(msg: str, exc: Exception | None = None):
     - exc (Exception | None): Optional exception to log
 
     Logic:
+    - Prepends the active session_id (if set) to the message for traceability
     - If an exception is provided, formats the full traceback and appends it to the message
     - Writes the error to the error log file
     """
+    sid = _current_session_id()
+    if sid:
+        msg = f"[session_id={sid}] {msg}"
     if exc:
         trace = "".join(
             traceback.format_exception(type(exc), exc, exc.__traceback__)
@@ -204,3 +239,18 @@ def log_function(func):
             raise
 
     return wrapper
+
+def log_execution(action: str, status: str, duration: float = 0.0, error_type: str = None, session_id: str = None):
+    """
+    Log an entry to the JSONL execution log file.
+    """
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "action": action,
+        "status": status,
+        "duration": duration,
+        "error_type": error_type,
+        "session_id": session_id
+    }
+    with open(os.path.join(LOG_DIR, "execution_log.jsonl"), "a", encoding="utf-8") as f:
+        f.write(json.dumps(log_entry) + "\n")
