@@ -23,7 +23,15 @@ os.makedirs(ICONS_DIR, exist_ok=True)
 # ----------------------------------------------------
 
 def save_failure_snapshot(element_name: str) -> str:
-    """Captures and saves a snapshot for review when an element fails."""
+    """
+    Captures and saves a full-screen snapshot for review when a UI element fails to match.
+    
+    Logic Flow:
+    1. Generates a unique filename using the element's name and the current timestamp.
+    2. Uses pyautogui to capture the current screen state.
+    3. Saves the screenshot into the REVIEW_QUEUE_DIR.
+    4. Logs the event and returns the filepath for reference.
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{element_name}_{timestamp}.png"
     filepath = os.path.join(REVIEW_QUEUE_DIR, filename)
@@ -35,7 +43,16 @@ def save_failure_snapshot(element_name: str) -> str:
     return filepath
 
 def list_pending_recoveries() -> list:
-    """Lists all failed elements waiting for user review."""
+    """
+    Lists all failed elements waiting for user review in the queue.
+    
+    Logic Flow:
+    1. Checks if the REVIEW_QUEUE_DIR exists.
+    2. Iterates through all PNG files in the directory.
+    3. Parses the filename to extract the base element name (stripping the timestamp).
+    4. Gathers file metadata (modification time) to sort the queue.
+    5. Returns a list of dictionaries containing recovery details, sorted by newest first.
+    """
     recoveries = []
     if not os.path.exists(REVIEW_QUEUE_DIR):
         return recoveries
@@ -44,6 +61,7 @@ def list_pending_recoveries() -> list:
         if file.endswith(".png"):
             filepath = os.path.join(REVIEW_QUEUE_DIR, file)
             parts = file.split("_")
+            # Reconstruct the element name by omitting the timestamp parts
             if len(parts) >= 2:
                 element_name = "_".join(parts[:-2]) if len(parts) > 2 else parts[0]
             else:
@@ -57,65 +75,29 @@ def list_pending_recoveries() -> list:
     return sorted(recoveries, key=lambda x: x["timestamp"], reverse=True)
 
 def delete_recovery(filepath: str) -> bool:
-    """Delete a specific recovery screenshot from the queue."""
+    """
+    Deletes a specific recovery screenshot from the review queue.
+    
+    Logic Flow:
+    1. Verifies the file exists at the given filepath.
+    2. Removes the file from the filesystem.
+    3. Returns True if successful, False otherwise.
+    """
     if os.path.exists(filepath):
         os.remove(filepath)
         return True
     return False
 
-def crop_snapshot(snapshot_path: str, crop_box: tuple):
-    """
-    Crops the snapshot according to crop_box and returns the resulting PIL Image object.
-    Does NOT write to disk or delete any files.
-    Returns the cropped PIL Image on success, or None on failure.
-    crop_box should be (left, top, right, bottom).
-    """
-    try:
-        with Image.open(snapshot_path) as img:
-            cropped_img = img.crop(crop_box)
-            # Return a copy so the file handle can be closed cleanly
-            return cropped_img.copy()
-    except Exception as e:
-        print(f"Error while cropping: {e}")
-        return None
-
-def save_recovery_to_icon(snapshot_path: str, crop_box: tuple, target_icon: str) -> bool:
-    """
-    Crops the snapshot and saves it into the target icon directory.
-    After successful save, deletes the snapshot from the review queue.
-    crop_box should be (left, top, right, bottom).
-    """
-    target_dir = os.path.join(ICONS_DIR, target_icon)
-    os.makedirs(target_dir, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    new_filepath = os.path.join(target_dir, f"{target_icon}_{timestamp}.png")
-
-    try:
-        # Perform Crop
-        with Image.open(snapshot_path) as img:
-            cropped_img = img.crop(crop_box)
-            cropped_img.save(new_filepath)
-        
-        # Delete original snapshot as it was successfully processed
-        delete_recovery(snapshot_path)
-        print(f"Successfully cropped and saved {target_icon} to {new_filepath}")
-        return True
-        
-    except Exception as e:
-        print(f"Error while saving crop: {e}")
-        return False
-
 def save_cropped_image_to_icon(cropped_img, snapshot_path: str, target_icon: str) -> bool:
     """
     Saves a pre-cropped PIL Image into the target icon directory and removes
     the original snapshot from the review queue.
-    This is used when the Crop step has already been performed separately.
-
-    Parameters:
-    - cropped_img: PIL Image object (already cropped)
-    - snapshot_path: original snapshot path (deleted after successful save)
-    - target_icon: name of the icon folder to save into
+    
+    Logic Flow:
+    1. Ensures the target directory for the specific icon name exists.
+    2. Generates a new timestamped filename.
+    3. Saves the in-memory cropped PIL Image to the filesystem.
+    4. Removes the original failure snapshot since it has been successfully processed.
     """
     target_dir = os.path.join(ICONS_DIR, target_icon)
     os.makedirs(target_dir, exist_ok=True)
@@ -137,7 +119,14 @@ def save_cropped_image_to_icon(cropped_img, snapshot_path: str, target_icon: str
 # ----------------------------------------------------
 
 def list_icons() -> list:
-    """Lists all icon directories located in the ICONS_DIR."""
+    """
+    Lists all icon directories located in the ICONS_DIR.
+    
+    Logic Flow:
+    1. Checks if the main icons directory exists.
+    2. Iterates over its contents and filters for subdirectories.
+    3. Returns a sorted list of folder names representing the known icons.
+    """
     if not os.path.exists(ICONS_DIR):
         return []
     
@@ -145,7 +134,15 @@ def list_icons() -> list:
     return sorted(dirs)
 
 def list_icon_images(icon_name: str) -> list:
-    """Returns a list of image paths for a specific icon."""
+    """
+    Returns a list of image paths for a specific icon.
+    
+    Logic Flow:
+    1. Builds the path to the specific icon's directory.
+    2. Validates that the directory exists.
+    3. Scans for files ending with .png or .PNG and collects their full paths.
+    4. Returns the sorted list of image file paths.
+    """
     target_dir = os.path.join(ICONS_DIR, icon_name)
     if not os.path.exists(target_dir):
         return []
@@ -154,7 +151,14 @@ def list_icon_images(icon_name: str) -> list:
     return sorted(images)
 
 def delete_icon_image(filepath: str) -> bool:
-    """Deletes an image from an icon folder."""
+    """
+    Deletes an image from an icon folder.
+    
+    Logic Flow:
+    1. Checks if the specific image file exists.
+    2. Removes the file from the filesystem to clean up.
+    3. Returns True on success, False otherwise.
+    """
     if os.path.exists(filepath):
         os.remove(filepath)
         return True

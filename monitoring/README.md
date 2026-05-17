@@ -11,3 +11,13 @@ The system operates from a baseline score of `100` and scans the most recent log
 
 ## Application Use
 The functions `calculate_health_score(logs)` and `get_system_health(logs)` act together to summarize isolated severity instances alongside an overall integer output. Alerts on the UI dynamically shift between green, orange, or red accordingly.
+
+## User Interface (`gui.py`)
+The module includes an encapsulated FreeSimpleGUI layout that visualizes the current health of the application. It consists of:
+- A real-time **Health Status** and numerical **Health Score**.
+- A **Recent Alerts** list displaying tracked anomalies.
+- A **Traceback Details** pane that maps high-level alert summaries back to their actual traceback strings in `error.log` via the `get_alert_log_details` logic.
+
+## Recent Updates
+- **Log Correlation:** Added functionality to match short execution log entries (JSONL) to multiline system error blocks in `error.log` using common `session_id` tags.
+- **Documentation:** Inline comments and docstrings have been added across `health.py` and `gui.py` to clarify the mathematical approach to system health monitoring.

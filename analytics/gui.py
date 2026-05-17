@@ -1,5 +1,15 @@
 import FreeSimpleGUI as sg
 
+# ----------------------------------------------------
+# Analytics Dashboard Layout
+# ----------------------------------------------------
+# Logic Flow:
+# 1. Defines a grid of Frames to display Key Performance Indicators (KPIs).
+# 2. Row 1: Shows raw counts for Total Logs, Failures, and Total Messages.
+# 3. Row 2: Shows computed percentages for Success Rate and Error Rate.
+# 4. Row 3: Shows Average Duration and session-based Throughput metrics.
+# 5. Row 4: Contains a "Refresh Analytics" button to trigger the event loop
+#    to fetch the latest data from the logs and update these UI components.
 analytics_layout = [
     [sg.Text('Analytics Dashboard', font='Helvetica 16 bold', justification='center', expand_x=True)],
     [

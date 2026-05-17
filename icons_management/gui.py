@@ -7,6 +7,12 @@ PREVIEW_H = 400
 # ----------------------------------------------------
 # Usage Icons Layout
 # ----------------------------------------------------
+# Logic Flow:
+# 1. This tab provides a two-column view to manage existing icons.
+# 2. The left column lists all discovered icon directories.
+# 3. The right column lists individual image variants for the selected icon.
+# 4. A preview pane at the bottom shows a 500x400 rendering of the selected image.
+# 5. Buttons are provided to Delete the selected image or Refresh the directory lists.
 usage_icons_layout = [
     [sg.Text('Active Icons Directory:', font='Helvetica 12 bold')],
     [
@@ -38,6 +44,11 @@ usage_icons_layout = [
 # ----------------------------------------------------
 # UI Recovery Queue Layout
 # ----------------------------------------------------
+# Logic Flow:
+# 1. This tab provides an interface for resolving missing UI element snapshots.
+# 2. A Listbox at the top displays pending failures (screenshots of the full screen when an element wasn't found).
+# 3. An interactive Graph (600x400) acts as a canvas where the user can draw a bounding box to crop the actual element.
+# 4. Action buttons at the bottom allow the user to Crop, Undo/Redo, Save the crop to a specific icon folder, or Delete the failure.
 recovery_queue_layout = [
     [sg.Text('Failed Elements Waiting Review:', font='Helvetica 12 bold')],
     [
@@ -73,6 +84,9 @@ recovery_queue_layout = [
 # ----------------------------------------------------
 # Main Exported Layout
 # ----------------------------------------------------
+# Logic Flow:
+# This bundles the two sub-layouts (Usage Icons and Recovery Queue) into a single
+# TabGroup so it can be exported and integrated seamlessly into the main app window.
 icons_management_layout = [
     [sg.Text('Icons Management & Recovery', font='Helvetica 16 bold', justification='center', expand_x=True)],
     [

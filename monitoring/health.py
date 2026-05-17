@@ -1,14 +1,27 @@
 from dataclasses import dataclass
 from typing import List, Dict
+import os
+import json
+
 
 @dataclass
 class AutomationError:
+    """
+    Data structure representing a categorized error within the automation system.
+    """
     type: str
     severity: str  # LOW, MEDIUM, CRITICAL
     message: str
 
 def detect_repeated_errors(logs: List[Dict]) -> List[AutomationError]:
-    """Identify if the same error type repeats consecutively."""
+    """
+    Identify if the same error type repeats consecutively.
+    
+    Logic:
+    - Scans the most recent 50 logs.
+    - If the same error appears 3 times in a row, it's flagged as a MEDIUM severity repeated error.
+    - If it reaches 5 times in a row, its severity escalates to CRITICAL.
+    """
     repeated_errors = []
     if not logs:
         return repeated_errors
@@ -43,7 +56,14 @@ def detect_repeated_errors(logs: List[Dict]) -> List[AutomationError]:
     return repeated_errors
 
 def detect_critical_failures(logs: List[Dict]) -> List[AutomationError]:
-    """Identify critical errors like full system crashes, disconnections."""
+    """
+    Identify critical errors like full system crashes, disconnections.
+    
+    Logic:
+    - Checks the last 20 logs.
+    - Matches any failed logs against a predefined list of CRITICAL_TYPES.
+    - Creates an AutomationError with CRITICAL severity for any matches.
+    """
     critical_errors = []
     if not logs:
         return critical_errors
@@ -61,7 +81,14 @@ def detect_critical_failures(logs: List[Dict]) -> List[AutomationError]:
     return critical_errors
 
 def detect_minor_errors(logs: List[Dict], repeated_errors: List[AutomationError], critical_errors: List[AutomationError]) -> List[AutomationError]:
-    """Identify minor errors, which are any errors not in repeated or critical lists."""
+    """
+    Identify minor errors, which are any errors not in repeated or critical lists.
+    
+    Logic:
+    - Iterates over all provided logs.
+    - If a failure is found that hasn't already been categorized as repeated or critical,
+      it is flagged as a LOW severity minor error.
+    """
     if not logs:
         return []
     
@@ -82,6 +109,15 @@ def detect_minor_errors(logs: List[Dict], repeated_errors: List[AutomationError]
     return minor_errors
 
 def calculate_health_score(logs: List[Dict]) -> int:
+    """
+    Calculate an overall system health score from 0 to 100 based on recent logs.
+    
+    Logic:
+    - Starts with a perfect score of 100.
+    - Evaluates up to the 100 most recent logs.
+    - Applies penalties: -40 for each critical error, -15 for repeated errors, and -5 for minor errors.
+    - Clamps the final score between 0 and 100.
+    """
     score = 100
     if not logs:
         return score
@@ -100,6 +136,12 @@ def calculate_health_score(logs: List[Dict]) -> int:
     return max(0, min(100, score))  # Clamp between 0 and 100
 
 def get_health_status(score: int) -> str:
+    """
+    Map a numerical health score to a descriptive status and UI color.
+    
+    Returns:
+        A tuple of (status_text, hex_color).
+    """
     if score >= 80:
         return ('HEALTHY', '#00FF00')
     elif score >= 50:
@@ -108,6 +150,10 @@ def get_health_status(score: int) -> str:
         return ('CRITICAL', '#FF6666')
 
 def get_system_health(logs: List[Dict]) -> Dict:
+    """
+    Aggregate health score, status, and identified issues into a comprehensive dictionary.
+    This serves as the primary data payload for the monitoring UI.
+    """
     score = calculate_health_score(logs)
     status, color = get_health_status(score)
     return {
@@ -138,9 +184,6 @@ def get_alert_log_details(
 
     Falls back gracefully if log files are missing or no match is found.
     """
-    import os
-    import json
-
     # --- Step 1: collect matching JSONL entries ---
     matching_entries = [
         log for log in logs

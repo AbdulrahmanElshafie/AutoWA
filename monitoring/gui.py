@@ -1,5 +1,11 @@
 import FreeSimpleGUI as sg
 
+# Define the layout for the System Health Monitor UI tab.
+# This layout consists of a main header and two side-by-side columns:
+# 1. Left column: Displays the current health status ('HEALTHY', 'WARNING', etc.), 
+#    the numerical health score (0-100), and a button to manually trigger a health check.
+# 2. Right column: Displays a list of recent alerts and a multi-line text area for 
+#    viewing detailed traceback and context when an alert is clicked.
 monitoring_layout = [
     [sg.Text('System Health Monitor', font='Helvetica 16 bold', justification='center', expand_x=True)],
     [

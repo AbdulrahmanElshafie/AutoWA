@@ -16,7 +16,7 @@ The **AutoWA** is a powerful, professional Python-based desktop tool designed to
 - **System Health & Log Dashboards**: Dedicated UI pages to visualize JSONL execution stats, error alarms, and deep system monitoring telemetry.
 
 ## ⚠️ Known Weaknesses & Constraints
-- **Theme & Language Locked**: It currently only actively supports **WhatsApp Web in Dark Mode**, and resolves strictly to **English & Arabic**. To add more languages or light-mode interfaces, you must manually capture and include the matching OpenCV assets (`.PNG` UI fragments) in the `assets/` folder. The same limitation applied when introducing entirely new browsers not yet mapped.
+- **Theme & Language Mapped**: While originally locked to Dark Mode and English/Arabic, the system now natively supports fallback configurations and secondary asset mappings. This allows it to automatically detect and adapt to Light Mode and various additional WhatsApp Web languages! (New languages just require their localized UI assets dropped into the folder).
 - **Number Routing Constraints**: Adding contacts programmatically currently assumes **Egyptian phone numbers** exclusively, routing them via the WhatsApp API. Foreign (international) numbers are texted directly without going through the native 'Save Contact' book pipeline. Support for adding varied foreign routing logic is scheduled for future updates!
 - **Foreground Dedication**: It utilizes aggressive image-recognition (`pyautogui`). The automation layer demands absolute focus. You **cannot** drastically move your mouse, cover the designated browser window, or minimize the tab while the core execution thread is dispatched.
 
@@ -25,7 +25,7 @@ We are actively building toward making this system a comprehensive CRM tool. Exc
 - **Richer WhatsApp Interactions**: Constructing new payload handlers for sending live locations, injecting emojis natively, and formatting rich texts.
 - **Customer Support Agent Mode**: Turning the execution loop from a unidirectional broadcasting thread into a bidirectional listener (DOM parsing) for response-driven WhatsApp Support.
 - **Foreign Number Optimization**: Deeply handling contact saving pipelines and regex validation for non-Egyptian international targets.
-- **Global Stylization Support**: Allowing configuration-less swapping between Dark Mode and Light Mode, and auto-fallback language mapping.
+
 
 ---
 
@@ -43,7 +43,10 @@ Project Root
 ├── Configuration & Contracts
 ├── Data Layer
 ├── Assets Layer
-└── Logging & Diagnostics
+├── Logging & Diagnostics
+├── Icon Management & UI Recovery System
+├── Analytics Layer
+└── Monitoring Layer
 ```
 ### Layer Responsibilities
 - GUI Layer: handles asynchronous user interaction, cross-thread execution controls, and decoupled visual feedback.
@@ -53,7 +56,9 @@ Project Root
 - Data Layer: persistent target ingestion schemas (CSV).
 - Assets Layer: binary computer-vision references (`.PNG`) mapped to UI elements.
 - Logging & Diagnostics: streams ephemeral daemon outputs and structured JSONL analysis logs.
-
+- Icon Management & UI Recovery System: Manages icon screenshots and UI recovery.
+- Analytics Layer: Parses metrics into session-based throughput stats.
+- Monitoring Layer: Real-time system monitoring logic.
 ###  Project Structure:
 ```
 .
@@ -70,6 +75,7 @@ Project Root
 ├── assets/ — UI Detection Images: Contains screenshots used for OpenCV template matching.
 ├── docs/ — System Documentation: overall architecture and rules.
 ├── logs/ — Logs: Stores runtime JSONL streams and error tracking.
+├── icon_management/ — Icon Management & UI Recovery System: Manages icon screenshots and UI recovery.
 ```
 
 ---
