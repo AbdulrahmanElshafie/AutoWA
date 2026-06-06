@@ -13,6 +13,7 @@ behavior so that timing logic is:
 """
 
 
+from pandas.io import json
 import random
 
 class TimeConroller:
@@ -148,4 +149,20 @@ class TimeConroller:
                 - self.distracted
         """
         return random.choice([self.normal, self.slow, self.distracted])
+    
+
+import pyautogui
+import os
+import json
+
+def getObjBoxSave(obj, confidence=0.8, grayscale=True):
+    obj_box = pyautogui.locateOnScreen(obj, confidence=confidence, grayscale=grayscale)
+    # Box(left=1416, top=562, width=50, height=41)
+    # region (a 4-integer tuple of (left, top, width, height))
+    coordinates_file = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config") + os.sep + "coordinates.json", "rw")
+    coordinates = json.load(coordinates_file)
+    coordinates[obj] = obj_box
+    coordinates_file.write(json.dump(coordinates))
+    coordinates_file.close()
+    return obj_box
     
