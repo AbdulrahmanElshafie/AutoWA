@@ -1,13 +1,12 @@
 # AutoWA — Professional WhatsApp Outreach & Workflow Automation
 
-![AutoWA Logo](./AutoWA-Logo.PNG)
+![AutoWA Logo](./AutoWA-Logo.png)
 
 AutoWA is a desktop automation platform built to streamline large-scale WhatsApp communication workflows with human-like behavior simulation, dynamic personalization, and document-based messaging.
 
 Designed for agencies, recruiters, sales teams, and operations-heavy workflows, it transforms repetitive WhatsApp outreach into a controlled and scalable system.
 
-<!-- markdownlint-disable-next-line MD033 -->
-<video src="./AutoWA-Demo.mp4" controls width="800"></video>
+![AutoWA Demo](./AutoWA-Demo.gif)
 
 ---
 
