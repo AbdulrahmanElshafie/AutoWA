@@ -1,10 +1,13 @@
 # AutoWA — Professional WhatsApp Outreach & Workflow Automation
 
+![AutoWA Logo](./AutoWA-Logo.PNG)
+
 AutoWA is a desktop automation platform built to streamline large-scale WhatsApp communication workflows with human-like behavior simulation, dynamic personalization, and document-based messaging.
 
 Designed for agencies, recruiters, sales teams, and operations-heavy workflows, it transforms repetitive WhatsApp outreach into a controlled and scalable system.
 
-![Demo Screenshot](./AutoWA.PNG)
+<!-- markdownlint-disable-next-line MD033 -->
+<video src="./AutoWA-Demo.mp4" controls width="800"></video>
 
 ---
 
@@ -51,18 +54,23 @@ This allows teams to scale WhatsApp communication while maintaining more natural
 ## Use Cases
 
 ### Lead Generation & Sales Outreach
+
 Send personalized first-touch and follow-up messages to lead lists.
 
 ### Recruitment & HR
+
 Automate candidate communication and document delivery.
 
 ### Customer Support Operations
+
 Handle repetitive support-side messaging workflows.
 
 ### Agency / Marketing Outreach
+
 Scale campaign communication across multiple accounts.
 
 ### Internal Operations
+
 Send structured reminders, approvals, and updates.
 
 ---
@@ -96,15 +104,19 @@ WhatsApp Web Interface
 ### Layer Breakdown
 
 ### GUI Layer
+
 Handles execution control, settings, monitoring, and user feedback.
 
 ### Core Engine
+
 Validates input data, orchestrates workflow logic, controls batching and retries.
 
 ### Automation Layer
+
 Performs browser and desktop interaction using image recognition and event simulation.
 
 ### Data & Config Layer
+
 Stores templates, schemas, job inputs, logs, and assets.
 
 ---
