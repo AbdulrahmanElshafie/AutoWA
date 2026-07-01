@@ -240,3 +240,28 @@ def get_alert_log_details(
 
     return "\n".join(lines)
 
+
+def resolve_bug(error_type: str, jsonl_path: str = "logs/execution_log.jsonl"):
+    """
+    Remove or mark as resolved log entries corresponding to the given error_type.
+    This effectively deletes the bug from the alerts and improves system health.
+    """
+    if not os.path.exists(jsonl_path):
+        return
+    
+    updated_lines = []
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                log_entry = json.loads(line)
+                if log_entry.get("status") == "failed" and log_entry.get("error_type") == error_type:
+                    log_entry["status"] = "resolved"
+                    updated_lines.append(json.dumps(log_entry) + "\n")
+                else:
+                    updated_lines.append(line)
+            except:
+                updated_lines.append(line)
+                
+    with open(jsonl_path, 'w', encoding='utf-8') as f:
+        f.writelines(updated_lines)
+

@@ -26,12 +26,13 @@ from .layout import config
 from .helpers import *
 import math
 from analytics.analyzer import get_full_analytics, load_logs
-from monitoring.health import get_system_health, get_alert_log_details
+from monitoring.health import get_system_health, get_alert_log_details, resolve_bug
 from icons_management.logic import list_icons, list_icon_images, delete_icon_image, list_pending_recoveries, delete_recovery, save_cropped_image_to_icon
 from icons_management.gui import PREVIEW_W, PREVIEW_H
 import base64
 from PIL import Image
 import io
+import re
 
 # Global flag to indicate if the sending process is currently running
 running = False  
@@ -480,6 +481,8 @@ def handle_events(event, values, window):
             )
         window['-ALERTS-'].update(alerts)
         window['-ALERT_DETAIL-'].update('Click an alert to view details.')
+        if '-RESOLVE_BUG-' in window.key_dict:
+            window['-RESOLVE_BUG-'].update(disabled=True)
         return None
 
     elif event == '-ALERTS-' and values['-ALERTS-']:
@@ -488,6 +491,19 @@ def handle_events(event, values, window):
         selected = values['-ALERTS-'][0]
         detail = alert_details.get(selected, 'No additional details available.')
         window['-ALERT_DETAIL-'].update(detail)
+        if '-RESOLVE_BUG-' in window.key_dict:
+            window['-RESOLVE_BUG-'].update(disabled=False)
+        return None
+
+    elif event == '-RESOLVE_BUG-':
+        if values['-ALERTS-']:
+            selected = values['-ALERTS-'][0]
+            match = re.match(r"\[.*?\] (.*)", selected)
+            if match:
+                error_type = match.group(1)
+                resolve_bug(error_type, "logs/execution_log.jsonl")
+                sg.popup(f"Bug '{error_type}' has been resolved!")
+                window.write_event_value('-CHECK_HEALTH-', None)
         return None
 
     # =========================================================================
