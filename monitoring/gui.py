@@ -28,7 +28,8 @@ monitoring_layout = [
                 font=('Courier New', 9),
                 background_color='#1e1e1e',
                 text_color='#d4d4d4'
-            )]
+            )],
+            [sg.Button('Resolve Bug', key='-RESOLVE_BUG-', disabled=True, expand_x=True)]
         ], expand_x=True, expand_y=True)
     ]
 ]
